@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アークナイツ：エンドフィールド 武器シナジー＆フィルターツール</title>
+    <meta name="description" content="アークナイツ：エンドフィールド（Endfield）の武器効果（基礎効果・付加効果・スキル効果）が一致する武器をドロップエリアごとに検索・絞り込める非公式ファンツール。">
+    <!-- FontAwesome for futuristic look -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header HUD -->
+    <header>
+        <div class="header-container">
+            <div class="logo-section">
+                <div class="logo-tag">Endfield</div>
+                <div>
+                    <h1>武器効果シナジーチェッカー</h1>
+                    <div class="logo-sub">WEAPON SYNERGY & FILTER SYSTEM</div>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="nav-tabs">
+                <button class="tab-btn active" data-tab="synergy">
+                    <span>📡</span> シナジー検索
+                </button>
+                <button class="tab-btn" data-tab="db">
+                    <span>📂</span> 武器データベース
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-container">
+
+        <!-- Tab 1: Synergy Finder -->
+        <section id="synergy-tab" class="tab-content active">
+            <div class="synergy-grid">
+                
+                <!-- Left Control Column -->
+                <div class="weapon-selector-box">
+                    <div class="panel">
+                        <div class="panel-title">
+                            <span class="accent-dot"></span> 基準武器の選択
+                        </div>
+                        
+                        <!-- Dropdown Select -->
+                        <div class="select-wrapper">
+                            <select id="weapon-select" class="custom-select">
+                                <!-- Options populated dynamically in app.js -->
+                            </select>
+                        </div>
+                        
+                        <!-- Quick Scrollable List -->
+                        <div class="quick-select-header">クイック選択 (全53種)</div>
+                        <div id="quick-select-list" class="quick-select-list">
+                            <!-- Items populated dynamically in app.js -->
+                        </div>
+                    </div>
+
+                    <!-- Selected Weapon Summary Card -->
+                    <div id="selected-weapon-container">
+                        <!-- Populated dynamically in app.js -->
+                    </div>
+                </div>
+
+                <!-- Right Synergy Results Column -->
+                <div>
+                    <div class="panel" style="margin-bottom: 1rem;">
+                        <div class="panel-title" style="border: none; margin-bottom: 0; padding-bottom: 0;">
+                            <span class="accent-dot"></span> ドロップエリア別効果一致武器
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            選択した武器と同じエリアで入手でき、かつ効果（基礎効果・付加効果・スキル効果）が一致する他の武器を、一致数（3個一致・2個一致・1個一致）ごとにグループ化して表示します。
+                        </p>
+                    </div>
+                    
+                    <div id="synergy-results" class="synergy-results">
+                        <!-- Populated dynamically in app.js -->
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Tab 2: Full Database Explorer -->
+        <section id="db-tab" class="tab-content">
+            <div class="panel" style="padding-bottom: 1.25rem;">
+                <div class="panel-title filter-toggle collapsed" id="filter-toggle-btn" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; border-bottom: none; padding-bottom: 0; margin-bottom: 0;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="accent-dot"></span> データベース絞り込みフィルター
+                    </div>
+                    <span class="toggle-icon" style="font-size: 0.8rem; transition: transform 0.3s ease;">🔽</span>
+                </div>
+                
+                <div id="filter-content" class="filter-content-wrapper collapsed">
+                    <!-- Filter Bar Grid -->
+                    <div class="filter-bar" style="margin-top: 1.25rem;">
+                        <!-- Text Search -->
+                        <div class="input-group">
+                            <label for="search-input">キーワード検索</label>
+                            <input type="text" id="search-input" class="form-control" placeholder="武器名、効果名、キャラ名...">
+                        </div>
+                        
+                        <!-- Area Filter -->
+                        <div class="input-group">
+                            <label for="filter-area">入手エリア</label>
+                            <select id="filter-area" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Rarity Filter -->
+                        <div class="input-group">
+                            <label for="filter-rarity">レアリティ</label>
+                            <select id="filter-rarity" class="form-control">
+                                <option value="">すべて</option>
+                                <option value="6">★6</option>
+                                <option value="5">★5</option>
+                            </select>
+                        </div>
+
+                        <!-- Character Filter -->
+                        <div class="input-group">
+                            <label for="filter-char">モチーフキャラ</label>
+                            <select id="filter-char" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Weapon Type Filter -->
+                        <div class="input-group">
+                            <label for="filter-type">武器種</label>
+                            <select id="filter-type" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="filter-bar" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 1rem;">
+                        <!-- Base Effect Filter -->
+                        <div class="input-group">
+                            <label for="filter-base">基礎効果</label>
+                            <select id="filter-base" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Extra Effect Filter -->
+                        <div class="input-group">
+                            <label for="filter-extra">付加効果</label>
+                            <select id="filter-extra" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Skill Effect Filter -->
+                        <div class="input-group">
+                            <label for="filter-skill">スキル効果</label>
+                            <select id="filter-skill" class="form-control">
+                                <option value="">すべて</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+
+                        <!-- Reset Button -->
+                        <div class="reset-btn-wrapper" style="display: flex; align-items: flex-end;">
+                            <button id="reset-filters" class="reset-btn">
+                                <span>🔄</span> フィルターリセット
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Controls -->
+            <div class="db-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap;">
+                <button id="add-weapon-btn" class="reset-btn" style="background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">
+                    <span>➕</span> 新規武器追加
+                </button>
+                <div class="db-data-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button id="export-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent);">
+                        <span>📥</span> エクスポート(data.js)
+                    </button>
+                    <label for="import-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <span>📤</span> インポート(JSON)
+                        <input type="file" id="import-file" accept=".json,.js" style="display: none;">
+                    </label>
+                    <button id="reset-db-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 71, 0, 0.1); border-color: rgba(255, 71, 0, 0.3); color: var(--rarity-6);">
+                        <span>🔄</span> 初期設定に戻す
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <span id="stats-total">該当件数: -- 件</span>
+                <span style="font-size: 0.8rem; opacity: 0.7;">※表の行をクリックすると詳細ポップアップを表示します</span>
+            </div>
+
+            <!-- Data Table wrapper -->
+            <div class="db-table-wrapper">
+                <table id="db-table" class="db-table">
+                    <thead>
+                        <tr>
+                            <th>武器名</th>
+                            <th>武器種</th>
+                            <th>モチーフキャラ</th>
+                            <th style="text-align: right;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Detailed View Popup Modal -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>武器詳細情報</h2>
+                <button class="close-modal-btn" id="close-detail-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="detail-modal-body">
+                <!-- Dynamically populated in app.js -->
+            </div>
+            <div class="modal-footer">
+                <button id="detail-delete-btn" class="reset-btn" style="background: rgba(255, 71, 0, 0.1); border-color: rgba(255, 71, 0, 0.3); color: var(--rarity-6); font-weight: 700;">
+                    <span>🗑️</span> 削除する
+                </button>
+                <button id="detail-edit-btn" class="reset-btn" style="background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent); font-weight: 700;">
+                    <span>📝</span> 編集する
+                </button>
+                <button id="detail-synergy-btn" class="reset-btn" style="background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">
+                    <span>📡</span> シナジー検索
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit/Add Weapon Popup Modal -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 id="form-action-title">➕ 武器データの追加</h2>
+                <button class="close-modal-btn" id="close-edit-modal">&times;</button>
+            </div>
+            <form id="weapon-form" class="editor-form" style="margin: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-weapon-id">
+                    
+                    <div class="input-group">
+                        <label for="edit-name">武器名 <span style="color: var(--rarity-6)">*</span></label>
+                        <input type="text" id="edit-name" class="form-control" required placeholder="例：鋼鉄余音">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-type">武器種 <span style="color: var(--rarity-6)">*</span></label>
+                        <select id="edit-type" class="form-control" required>
+                            <option value="片手剣">片手剣</option>
+                            <option value="大剣">大剣</option>
+                            <option value="長柄武器">長柄武器</option>
+                            <option value="拳銃">拳銃</option>
+                            <option value="アーツユニット">アーツユニット</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-rarity">レアリティ <span style="color: var(--rarity-6)">*</span></label>
+                        <select id="edit-rarity" class="form-control" required>
+                            <option value="6">★6</option>
+                            <option value="5">★5</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-char">モチーフキャラ <span style="color: var(--rarity-6)">*</span></label>
+                        <input type="text" id="edit-char" class="form-control" required placeholder="例：汎用 または アレッシュ">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-base">基礎効果</label>
+                        <input type="text" id="edit-base" class="form-control" placeholder="例：敏捷UP" list="base-suggestions">
+                        <datalist id="base-suggestions"></datalist>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-extra">付加効果</label>
+                        <input type="text" id="edit-extra" class="form-control" placeholder="例：物理ダメージUP" list="extra-suggestions">
+                        <datalist id="extra-suggestions"></datalist>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="edit-skill">スキル効果</label>
+                        <input type="text" id="edit-skill" class="form-control" placeholder="例：巧技" list="skill-suggestions">
+                        <datalist id="skill-suggestions"></datalist>
+                    </div>
+
+                    <div class="input-group">
+                        <label>ドロップエリア (複数選択可)</label>
+                        <div id="edit-areas-container" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border);">
+                            <!-- Checkboxes populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="new-area-name">新規エリアの追加</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="new-area-name" class="form-control" placeholder="例：原石研究パーク">
+                            <button type="button" id="add-new-area-btn" class="reset-btn" style="padding: 0.5rem 1rem;">追加</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding: 1rem 1.5rem;">
+                    <button type="button" id="cancel-btn" class="reset-btn" style="flex: 1;">キャンセル</button>
+                    <button type="submit" id="save-btn" class="reset-btn" style="flex: 1; background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer section -->
+    <footer>
+        <p>© 2026 アークナイツ：エンドフィールド 武器シナジーチェッカー | 非公式ファンツール</p>
+        <p style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.6;">
+            本サイトはゲーム『アークナイツ：エンドフィールド』の攻略情報をまとめたファンツールであり、HypergryphおよびYostarとは関係ありません。
+        </p>
+    </footer>
+
+    <!-- Load data first, then app logic -->
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
