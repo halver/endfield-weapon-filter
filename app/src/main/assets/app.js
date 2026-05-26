@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderQuickSelectList();
 
     let isInitialLoad = true;
+    let currentOptimizerMode = 'target'; // 'target' (狙い撃ち) or 'synergy' (同時収集)
 
     // Handle Weapon Selection Change
     function handleWeaponChange(weaponId) {
@@ -187,6 +188,211 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render Synergy Results by Area
         renderSynergyResults(selected);
+
+        // Render Filter Optimizer
+        renderFilterOptimizer(selected);
+    }
+
+    function renderFilterOptimizer(selected) {
+        const container = document.getElementById('filter-optimizer-container');
+        if (!container) return;
+
+        if (!selected.areas || selected.areas.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = `
+            <div class="optimizer-panel">
+                <div class="optimizer-title">
+                    <i>🎯</i> ドロップフィルター最適化推奨
+                </div>
+                <div class="optimizer-modes">
+                    <button class="mode-btn ${currentOptimizerMode === 'target' ? 'active' : ''}" data-mode="target">狙い撃ちモード</button>
+                    <button class="mode-btn ${currentOptimizerMode === 'synergy' ? 'active' : ''}" data-mode="synergy">同時収集モード</button>
+                </div>
+                <div class="optimizer-areas-list">
+        `;
+
+        const allBaseEffects = Array.from(uniqueBases);
+
+        selected.areas.forEach(areaName => {
+            const weaponsInArea = db.filter(w => w.areas && w.areas.includes(areaName));
+            const otherWeapons = weaponsInArea.filter(w => w.id !== selected.id);
+
+            let recommendedBases = [];
+            let recommendedExtraSkill = null;
+            let candidateES = [];
+
+            if (selected.extra_effect) {
+                candidateES.push({ type: 'extra', value: selected.extra_effect });
+            }
+            if (selected.skill_effect) {
+                candidateES.push({ type: 'skill', value: selected.skill_effect });
+            }
+
+            const simulateFilter = (bases, es) => {
+                return weaponsInArea.filter(w => {
+                    const baseMatches = bases.includes(w.base_effect);
+                    let esMatches = false;
+                    if (!es) {
+                        esMatches = true;
+                    } else {
+                        esMatches = (w.extra_effect === es.value || w.skill_effect === es.value);
+                    }
+                    return baseMatches && esMatches;
+                });
+            };
+
+            if (currentOptimizerMode === 'target') {
+                let bestES = null;
+                let minCount = Infinity;
+
+                if (candidateES.length > 0) {
+                    candidateES.forEach(es => {
+                        const matches = simulateFilter([selected.base_effect], es);
+                        if (matches.length < minCount) {
+                            minCount = matches.length;
+                            bestES = es;
+                        }
+                    });
+                }
+                recommendedExtraSkill = bestES;
+
+                recommendedBases.push(selected.base_effect);
+
+                const baseCounts = {};
+                allBaseEffects.forEach(b => {
+                    if (b !== selected.base_effect) {
+                        baseCounts[b] = 0;
+                    }
+                });
+                otherWeapons.forEach(w => {
+                    if (w.base_effect !== selected.base_effect && baseCounts[w.base_effect] !== undefined) {
+                        baseCounts[w.base_effect]++;
+                    }
+                });
+
+                const sortedDummies = Object.keys(baseCounts).sort((a, b) => baseCounts[a] - baseCounts[b]);
+                for (let i = 0; i < 2 && i < sortedDummies.length; i++) {
+                    recommendedBases.push(sortedDummies[i]);
+                }
+            } else {
+                let bestES = null;
+                let maxCount = -1;
+
+                if (candidateES.length > 0) {
+                    candidateES.forEach(es => {
+                        const matches = otherWeapons.filter(w => w.extra_effect === es.value || w.skill_effect === es.value);
+                        if (matches.length > maxCount) {
+                            maxCount = matches.length;
+                            bestES = es;
+                        }
+                    });
+                }
+                recommendedExtraSkill = bestES;
+
+                recommendedBases.push(selected.base_effect);
+
+                const synergyWeaponsWithES = otherWeapons.filter(w => {
+                    if (!recommendedExtraSkill) return false;
+                    return w.extra_effect === recommendedExtraSkill.value || w.skill_effect === recommendedExtraSkill.value;
+                });
+
+                const synergyBaseCounts = {};
+                synergyWeaponsWithES.forEach(w => {
+                    if (w.base_effect !== selected.base_effect) {
+                        synergyBaseCounts[w.base_effect] = (synergyBaseCounts[w.base_effect] || 0) + 1;
+                    }
+                });
+
+                const sortedSynergyBases = Object.keys(synergyBaseCounts).sort((a, b) => synergyBaseCounts[b] - synergyBaseCounts[a]);
+                sortedSynergyBases.forEach(b => {
+                    if (recommendedBases.length < 3) {
+                        recommendedBases.push(b);
+                    }
+                });
+
+                if (recommendedBases.length < 3) {
+                    const areaBaseCounts = {};
+                    otherWeapons.forEach(w => {
+                        if (!recommendedBases.includes(w.base_effect)) {
+                            areaBaseCounts[w.base_effect] = (areaBaseCounts[w.base_effect] || 0) + 1;
+                        }
+                    });
+                    const sortedAreaBases = Object.keys(areaBaseCounts).sort((a, b) => areaBaseCounts[b] - areaBaseCounts[a]);
+                    sortedAreaBases.forEach(b => {
+                        if (recommendedBases.length < 3) {
+                            recommendedBases.push(b);
+                        }
+                    });
+                }
+
+                if (recommendedBases.length < 3) {
+                    allBaseEffects.forEach(b => {
+                        if (recommendedBases.length < 3 && !recommendedBases.includes(b)) {
+                            recommendedBases.push(b);
+                        }
+                    });
+                }
+            }
+
+            const matchedWeapons = simulateFilter(recommendedBases, recommendedExtraSkill);
+            const totalWeaponsCount = weaponsInArea.length;
+            const matchedCount = matchedWeapons.length;
+
+            const baseBadgesHTML = recommendedBases.map(b => {
+                const isDummy = b !== selected.base_effect;
+                const badgeClass = isDummy ? 'opt-badge dummy-opt' : 'opt-badge base-opt';
+                const label = isDummy ? `${b} (ダミー)` : b;
+                return `<span class="${badgeClass}">${label}</span>`;
+            }).join(' ');
+
+            let esBadgeHTML = '';
+            if (recommendedExtraSkill) {
+                const badgeClass = recommendedExtraSkill.type === 'extra' ? 'opt-badge extra-opt' : 'opt-badge skill-opt';
+                const typeLabel = recommendedExtraSkill.type === 'extra' ? '付加' : 'スキル';
+                esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${recommendedExtraSkill.value}</span>`;
+            } else {
+                esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし (ダミー)</span>`;
+            }
+
+            html += `
+                <div class="optimizer-area-section">
+                    <div class="optimizer-area-name">📍 ${areaName}</div>
+                    <div class="optimizer-slots">
+                        <div class="optimizer-slot-row">
+                            <span class="slot-label">基礎効果 (3)</span>
+                            <div class="slot-badges">${baseBadgesHTML}</div>
+                        </div>
+                        <div class="optimizer-slot-row">
+                            <span class="slot-label">付加/スキル (1)</span>
+                            <div class="slot-badges">${esBadgeHTML}</div>
+                        </div>
+                    </div>
+                    <div class="optimizer-efficiency">
+                        <span class="efficiency-text">ドロップ候補の絞り込み:</span>
+                        <span class="efficiency-value">
+                            ${totalWeaponsCount}種 <span class="arrow">➔</span> ${matchedCount}種
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        container.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentOptimizerMode = btn.getAttribute('data-mode');
+                renderFilterOptimizer(selected);
+            });
+        });
     }
 
     function renderSelectedWeaponCard(w) {
