@@ -302,8 +302,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const simulateFilter = (bases, es) => {
                 return weaponsInArea.filter(w => {
                     const baseMatches = bases.includes(w.base_effect);
-                    const esMatches = es ? (w.extra_effect === es.value || w.skill_effect === es.value) : false;
-                    return baseMatches || esMatches;
+                    let esMatches = false;
+                    if (!es) {
+                        esMatches = true;
+                    } else {
+                        if (es.type === 'extra') {
+                            esMatches = (w.extra_effect === es.value);
+                        } else if (es.type === 'skill') {
+                            esMatches = (w.skill_effect === es.value);
+                        } else {
+                            esMatches = (w.extra_effect === es.value || w.skill_effect === es.value);
+                        }
+                    }
+                    return baseMatches && esMatches;
                 });
             };
 
@@ -348,7 +359,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (candidateES.length > 0) {
                     candidateES.forEach(es => {
-                        const matches = otherWeapons.filter(w => w.extra_effect === es.value || w.skill_effect === es.value);
+                        const matches = otherWeapons.filter(w => {
+                            if (es.type === 'extra') {
+                                return w.extra_effect === es.value;
+                            } else if (es.type === 'skill') {
+                                return w.skill_effect === es.value;
+                            }
+                            return false;
+                        });
                         if (matches.length > maxCount) {
                             maxCount = matches.length;
                             bestES = es;
@@ -361,7 +379,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const synergyWeaponsWithES = otherWeapons.filter(w => {
                     if (!recommendedExtraSkill) return false;
-                    return w.extra_effect === recommendedExtraSkill.value || w.skill_effect === recommendedExtraSkill.value;
+                    if (recommendedExtraSkill.type === 'extra') {
+                        return w.extra_effect === recommendedExtraSkill.value;
+                    } else if (recommendedExtraSkill.type === 'skill') {
+                        return w.skill_effect === recommendedExtraSkill.value;
+                    }
+                    return false;
                 });
 
                 const synergyBaseCounts = {};
