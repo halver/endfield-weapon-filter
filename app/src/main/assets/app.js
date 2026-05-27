@@ -189,12 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render Synergy Results by Area
         renderSynergyResults(selected);
 
-        // Render Filter Optimizer
-        renderFilterOptimizer(selected);
+        // Render Optimizer Mode Switcher
+        renderOptimizerModeSwitcher(selected);
     }
 
-    function renderFilterOptimizer(selected) {
-        const container = document.getElementById('filter-optimizer-container');
+    function renderOptimizerModeSwitcher(selected) {
+        const container = document.getElementById('optimizer-mode-container');
         if (!container) return;
 
         if (!selected.areas || selected.areas.length === 0) {
@@ -202,24 +202,92 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let html = `
-            <div class="optimizer-panel">
-                <div class="optimizer-title">
-                    <i>🎯</i> ドロップフィルター最適化推奨
+        container.innerHTML = `
+            <div class="optimizer-panel" style="margin-top: 1rem; padding: 1.25rem;">
+                <div class="optimizer-title" style="margin-bottom: 0.75rem; font-size: 0.9rem;">
+                    <i>🎯</i> オプティマイザーモード設定
                 </div>
-                <div class="optimizer-modes">
-                    <button class="mode-btn ${currentOptimizerMode === 'target' ? 'active' : ''}" data-mode="target">狙い撃ちモード</button>
-                    <button class="mode-btn ${currentOptimizerMode === 'synergy' ? 'active' : ''}" data-mode="synergy">同時収集モード</button>
+                <div class="optimizer-modes" style="margin-bottom: 0;">
+                    <button class="mode-btn ${currentOptimizerMode === 'target' ? 'active' : ''}" data-mode="target">狙い撃ち</button>
+                    <button class="mode-btn ${currentOptimizerMode === 'synergy' ? 'active' : ''}" data-mode="synergy">同時収集</button>
                 </div>
-                <div class="optimizer-areas-list">
+            </div>
         `;
+
+        container.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentOptimizerMode = btn.getAttribute('data-mode');
+                renderOptimizerModeSwitcher(selected);
+                renderSynergyResults(selected);
+            });
+        });
+    }
+
+    function renderSelectedWeaponCard(w) {
+        const isSpecialChar = w.character !== '汎用';
+        selectedWeaponContainer.innerHTML = `
+            <div class="selected-weapon-card rarity-${w.rarity}">
+                <div class="card-header-main">
+                    <div>
+                        <div class="weapon-title">${w.weapon_name}</div>
+                        <div class="stars">
+                            ${Array(w.rarity).fill('<span class="star-icon">★</span>').join('')}
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
+                        <span class="char-badge ${isSpecialChar ? 'special' : ''}">
+                            ${w.character}
+                        </span>
+                        <span class="type-badge">
+                            ${w.weapon_type || '-'}
+                        </span>
+                    </div>
+                </div>
+                <div class="weapon-effects-list">
+                    <div class="effect-row">
+                        <span class="effect-label">基礎効果</span>
+                        <span class="effect-val effect-base">${w.base_effect || '-'}</span>
+                    </div>
+                    <div class="effect-row">
+                        <span class="effect-label">付加効果</span>
+                        <span class="effect-val effect-extra">${w.extra_effect || '-'}</span>
+                    </div>
+                    <div class="effect-row">
+                        <span class="effect-label">スキル効果</span>
+                        <span class="effect-val effect-skill">${w.skill_effect || '-'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderSynergyResults(selected) {
+        synergyResultsContainer.innerHTML = '';
+
+        if (!selected.areas || selected.areas.length === 0) {
+            synergyResultsContainer.innerHTML = `
+                <div class="panel">
+                    <div class="no-match-state">
+                        <i>🗺️</i>
+                        <div>この武器のドロップエリア情報がありません。</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
 
         const allBaseEffects = Array.from(uniqueBases);
 
+        // Loop through each drop area of the selected weapon
         selected.areas.forEach(areaName => {
+            const areaContainer = document.createElement('div');
+            areaContainer.className = 'area-container';
+
+            // Find other weapons in the SAME area
             const weaponsInArea = db.filter(w => w.areas && w.areas.includes(areaName));
             const otherWeapons = weaponsInArea.filter(w => w.id !== selected.id);
 
+            // --- 1. OPTIMIZER LOGIC (Calculated per Area) ---
             let recommendedBases = [];
             let recommendedExtraSkill = null;
             let candidateES = [];
@@ -245,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (currentOptimizerMode === 'target') {
+                // 狙い撃ちモード
                 let bestES = null;
                 let minCount = Infinity;
 
@@ -278,6 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     recommendedBases.push(sortedDummies[i]);
                 }
             } else {
+                // 同時収集モード
                 let bestES = null;
                 let maxCount = -1;
 
@@ -337,133 +407,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const matchedWeapons = simulateFilter(recommendedBases, recommendedExtraSkill);
+            const matchedWeaponsForFilter = simulateFilter(recommendedBases, recommendedExtraSkill);
             const totalWeaponsCount = weaponsInArea.length;
-            const matchedCount = matchedWeapons.length;
+            const matchedCount = matchedWeaponsForFilter.length;
 
-            const baseBadgesHTML = recommendedBases.map(b => {
-                const isDummy = b !== selected.base_effect;
-                const badgeClass = isDummy ? 'opt-badge dummy-opt' : 'opt-badge base-opt';
-                const label = isDummy ? `${b} (ダミー)` : b;
-                return `<span class="${badgeClass}">${label}</span>`;
-            }).join(' ');
-
-            let esBadgeHTML = '';
-            if (recommendedExtraSkill) {
-                const badgeClass = recommendedExtraSkill.type === 'extra' ? 'opt-badge extra-opt' : 'opt-badge skill-opt';
-                const typeLabel = recommendedExtraSkill.type === 'extra' ? '付加' : 'スキル';
-                esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${recommendedExtraSkill.value}</span>`;
-            } else {
-                esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし (ダミー)</span>`;
-            }
-
-            html += `
-                <div class="optimizer-area-section">
-                    <div class="optimizer-area-name">📍 ${areaName}</div>
-                    <div class="optimizer-slots">
-                        <div class="optimizer-slot-row">
-                            <span class="slot-label">基礎効果 (3)</span>
-                            <div class="slot-badges">${baseBadgesHTML}</div>
-                        </div>
-                        <div class="optimizer-slot-row">
-                            <span class="slot-label">付加/スキル (1)</span>
-                            <div class="slot-badges">${esBadgeHTML}</div>
-                        </div>
-                    </div>
-                    <div class="optimizer-efficiency">
-                        <span class="efficiency-text">ドロップ候補の絞り込み:</span>
-                        <span class="efficiency-value">
-                            ${totalWeaponsCount}種 <span class="arrow">➔</span> ${matchedCount}種
-                        </span>
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `
-                </div>
-            </div>
-        `;
-
-        container.innerHTML = html;
-
-        container.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentOptimizerMode = btn.getAttribute('data-mode');
-                renderFilterOptimizer(selected);
-            });
-        });
-    }
-
-    function renderSelectedWeaponCard(w) {
-        const isSpecialChar = w.character !== '汎用';
-        selectedWeaponContainer.innerHTML = `
-            <div class="selected-weapon-card rarity-${w.rarity}">
-                <div class="card-header-main">
-                    <div>
-                        <div class="weapon-title">${w.weapon_name}</div>
-                        <div class="stars">
-                            ${Array(w.rarity).fill('<span class="star-icon">★</span>').join('')}
-                        </div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
-                        <span class="char-badge ${isSpecialChar ? 'special' : ''}">
-                            ${w.character}
-                        </span>
-                        <span class="type-badge">
-                            ${w.weapon_type || '-'}
-                        </span>
-                    </div>
-                </div>
-                <div class="weapon-effects-list">
-                    <div class="effect-row">
-                        <span class="effect-label">基礎効果</span>
-                        <span class="effect-val effect-base">${w.base_effect || '-'}</span>
-                    </div>
-                    <div class="effect-row">
-                        <span class="effect-label">付加効果</span>
-                        <span class="effect-val effect-extra">${w.extra_effect || '-'}</span>
-                    </div>
-                    <div class="effect-row">
-                        <span class="effect-label">スキル効果</span>
-                        <span class="effect-val effect-skill">${w.skill_effect || '-'}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderSynergyResults(selected) {
-        synergyResultsContainer.innerHTML = '';
-
-        if (!selected.areas || selected.areas.length === 0) {
-            synergyResultsContainer.innerHTML = `
-                <div class="panel">
-                    <div class="no-match-state">
-                        <i>🗺️</i>
-                        <div>この武器のドロップエリア情報がありません。</div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        // Loop through each drop area of the selected weapon
-        selected.areas.forEach(areaName => {
-            const areaContainer = document.createElement('div');
-            areaContainer.className = 'area-container';
-
-            // Find other weapons in the SAME area
-            const otherWeaponsInArea = db.filter(w =>
-                w.id !== selected.id &&
-                w.areas &&
-                w.areas.includes(areaName)
-            );
-
-            // Compute matches
+            // Compute matches for the traditional list (showing matches between other weapons and selected weapon)
             const matchedWeapons = [];
-
-            otherWeaponsInArea.forEach(w => {
+            otherWeapons.forEach(w => {
                 let matchCount = 0;
                 const matches = { base: false, extra: false, skill: false };
 
@@ -489,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Area Header
+            // --- 2. RENDER AREA HEADER ---
             const areaHeader = document.createElement('div');
             areaHeader.className = 'area-header';
 
@@ -514,6 +464,64 @@ document.addEventListener('DOMContentLoaded', () => {
             areaHeader.appendChild(titleGroup);
             areaHeader.appendChild(countSummary);
             areaContainer.appendChild(areaHeader);
+
+            // --- 3. RENDER INTEGRATED OPTIMIZER BOX ---
+            const baseBadgesHTML = recommendedBases.map(b => {
+                const isDummy = b !== selected.base_effect;
+                const badgeClass = isDummy ? 'opt-badge dummy-opt' : 'opt-badge base-opt';
+                const label = isDummy ? `${b} (ダミー)` : b;
+                return `<span class="${badgeClass}">${label}</span>`;
+            }).join(' ');
+
+            let esBadgeHTML = '';
+            if (recommendedExtraSkill) {
+                const badgeClass = recommendedExtraSkill.type === 'extra' ? 'opt-badge extra-opt' : 'opt-badge skill-opt';
+                const typeLabel = recommendedExtraSkill.type === 'extra' ? '付加' : 'スキル';
+                esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${recommendedExtraSkill.value}</span>`;
+            } else {
+                esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし (ダミー)</span>`;
+            }
+
+            const optimizerWrapper = document.createElement('div');
+            optimizerWrapper.className = 'optimizer-panel-embedded';
+            optimizerWrapper.style.margin = '0 0 1.25rem 0';
+            optimizerWrapper.style.padding = '1rem';
+            optimizerWrapper.style.background = 'rgba(0, 0, 0, 0.22)';
+            optimizerWrapper.style.border = '1px dashed rgba(242, 169, 0, 0.25)';
+            optimizerWrapper.style.borderRadius = '8px';
+
+            optimizerWrapper.innerHTML = `
+                <div class="optimizer-title" style="margin-bottom: 0.5rem; font-size: 0.8rem; opacity: 0.9;">
+                    <i>🎯</i> 推奨ドロップフィルター設定
+                </div>
+                <div class="optimizer-slots">
+                    <div class="optimizer-slot-row">
+                        <span class="slot-label" style="width: 75px;">基礎効果 (3)</span>
+                        <div class="slot-badges">${baseBadgesHTML}</div>
+                    </div>
+                    <div class="optimizer-slot-row">
+                        <span class="slot-label" style="width: 75px;">付加/スキル (1)</span>
+                        <div class="slot-badges">${esBadgeHTML}</div>
+                    </div>
+                </div>
+                <div class="optimizer-efficiency" style="margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.03);">
+                    <span class="efficiency-text">ドロップ候補の絞り込み:</span>
+                    <span class="efficiency-value">
+                        ${totalWeaponsCount}種 <span class="arrow">➔</span> ${matchedCount}種
+                    </span>
+                </div>
+            `;
+            areaContainer.appendChild(optimizerWrapper);
+
+            // --- 4. RENDER SYNERGY WEAPONS TREE ---
+            const treeTitle = document.createElement('div');
+            treeTitle.className = 'synergy-tree-title';
+            treeTitle.style.fontSize = '0.75rem';
+            treeTitle.style.color = 'var(--text-secondary)';
+            treeTitle.style.fontWeight = '600';
+            treeTitle.style.marginBottom = '0.5rem';
+            treeTitle.innerHTML = `▼ 効果一致する他の武器`;
+            areaContainer.appendChild(treeTitle);
 
             const hasAnyMatch = matchedWeapons.length > 0;
 
