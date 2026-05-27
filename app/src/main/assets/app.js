@@ -164,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderQuickSelectList();
 
     let isInitialLoad = true;
-    let currentOptimizerMode = 'target'; // 'target' (狙い撃ち) or 'synergy' (同時収集)
 
     // Handle Weapon Selection Change
     function handleWeaponChange(weaponId) {
@@ -188,39 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render Synergy Results by Area
         renderSynergyResults(selected);
-
-        // Render Optimizer Mode Switcher
-        renderOptimizerModeSwitcher(selected);
-    }
-
-    function renderOptimizerModeSwitcher(selected) {
-        const container = document.getElementById('optimizer-mode-container');
-        if (!container) return;
-
-        if (!selected.areas || selected.areas.length === 0) {
-            container.innerHTML = '';
-            return;
-        }
-
-        container.innerHTML = `
-            <div class="optimizer-panel" style="margin-top: 1rem; padding: 1.25rem;">
-                <div class="optimizer-title" style="margin-bottom: 0.75rem; font-size: 0.9rem;">
-                    <i>🎯</i> オプティマイザーモード設定
-                </div>
-                <div class="optimizer-modes" style="margin-bottom: 0;">
-                    <button class="mode-btn ${currentOptimizerMode === 'target' ? 'active' : ''}" data-mode="target">狙い撃ち</button>
-                    <button class="mode-btn ${currentOptimizerMode === 'synergy' ? 'active' : ''}" data-mode="synergy">同時収集</button>
-                </div>
-            </div>
-        `;
-
-        container.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentOptimizerMode = btn.getAttribute('data-mode');
-                renderOptimizerModeSwitcher(selected);
-                renderSynergyResults(selected);
-            });
-        });
     }
 
     function renderSelectedWeaponCard(w) {
@@ -310,152 +276,86 @@ document.addEventListener('DOMContentLoaded', () => {
                             esMatches = (w.extra_effect === es.value);
                         } else if (es.type === 'skill') {
                             esMatches = (w.skill_effect === es.value);
-                        } else {
-                            esMatches = (w.extra_effect === es.value || w.skill_effect === es.value);
                         }
                     }
                     return baseMatches && esMatches;
                 });
             };
 
-            if (currentOptimizerMode === 'target') {
-                // 狙い撃ちモード
-                let bestES = null;
-                let minCount = Infinity;
+            // オプティマイズ：常に「同時収集」仕様で計算
+            let bestES = null;
+            let maxCount = -1;
 
-                if (candidateES.length > 0) {
-                    candidateES.forEach(es => {
-                        const matches = simulateFilter([selected.base_effect], es);
-                        if (matches.length < minCount) {
-                            minCount = matches.length;
-                            bestES = es;
+            if (candidateES.length > 0) {
+                candidateES.forEach(es => {
+                    const matches = otherWeapons.filter(w => {
+                        if (es.type === 'extra') {
+                            return w.extra_effect === es.value;
+                        } else if (es.type === 'skill') {
+                            return w.skill_effect === es.value;
                         }
+                        return false;
                     });
-                }
-                recommendedExtraSkill = bestES;
-
-                recommendedBases.push(selected.base_effect);
-
-                const baseCounts = {};
-                allBaseEffects.forEach(b => {
-                    if (b !== selected.base_effect) {
-                        baseCounts[b] = 0;
+                    if (matches.length > maxCount) {
+                        maxCount = matches.length;
+                        bestES = es;
                     }
                 });
+            }
+            recommendedExtraSkill = bestES;
+
+            recommendedBases.push(selected.base_effect);
+
+            const synergyWeaponsWithES = otherWeapons.filter(w => {
+                if (!recommendedExtraSkill) return false;
+                if (recommendedExtraSkill.type === 'extra') {
+                    return w.extra_effect === recommendedExtraSkill.value;
+                } else if (recommendedExtraSkill.type === 'skill') {
+                    return w.skill_effect === recommendedExtraSkill.value;
+                }
+                return false;
+            });
+
+            const synergyBaseCounts = {};
+            synergyWeaponsWithES.forEach(w => {
+                if (w.base_effect !== selected.base_effect) {
+                    synergyBaseCounts[w.base_effect] = (synergyBaseCounts[w.base_effect] || 0) + 1;
+                }
+            });
+
+            const sortedSynergyBases = Object.keys(synergyBaseCounts).sort((a, b) => synergyBaseCounts[b] - synergyBaseCounts[a]);
+            sortedSynergyBases.forEach(b => {
+                if (recommendedBases.length < 3) {
+                    recommendedBases.push(b);
+                }
+            });
+
+            if (recommendedBases.length < 3) {
+                const areaBaseCounts = {};
                 otherWeapons.forEach(w => {
-                    if (w.base_effect !== selected.base_effect && baseCounts[w.base_effect] !== undefined) {
-                        baseCounts[w.base_effect]++;
+                    if (!recommendedBases.includes(w.base_effect)) {
+                        areaBaseCounts[w.base_effect] = (areaBaseCounts[w.base_effect] || 0) + 1;
                     }
                 });
-
-                const sortedDummies = Object.keys(baseCounts).sort((a, b) => baseCounts[a] - baseCounts[b]);
-                for (let i = 0; i < 2 && i < sortedDummies.length; i++) {
-                    recommendedBases.push(sortedDummies[i]);
-                }
-            } else {
-                // 同時収集モード
-                let bestES = null;
-                let maxCount = -1;
-
-                if (candidateES.length > 0) {
-                    candidateES.forEach(es => {
-                        const matches = otherWeapons.filter(w => {
-                            if (es.type === 'extra') {
-                                return w.extra_effect === es.value;
-                            } else if (es.type === 'skill') {
-                                return w.skill_effect === es.value;
-                            }
-                            return false;
-                        });
-                        if (matches.length > maxCount) {
-                            maxCount = matches.length;
-                            bestES = es;
-                        }
-                    });
-                }
-                recommendedExtraSkill = bestES;
-
-                recommendedBases.push(selected.base_effect);
-
-                const synergyWeaponsWithES = otherWeapons.filter(w => {
-                    if (!recommendedExtraSkill) return false;
-                    if (recommendedExtraSkill.type === 'extra') {
-                        return w.extra_effect === recommendedExtraSkill.value;
-                    } else if (recommendedExtraSkill.type === 'skill') {
-                        return w.skill_effect === recommendedExtraSkill.value;
-                    }
-                    return false;
-                });
-
-                const synergyBaseCounts = {};
-                synergyWeaponsWithES.forEach(w => {
-                    if (w.base_effect !== selected.base_effect) {
-                        synergyBaseCounts[w.base_effect] = (synergyBaseCounts[w.base_effect] || 0) + 1;
-                    }
-                });
-
-                const sortedSynergyBases = Object.keys(synergyBaseCounts).sort((a, b) => synergyBaseCounts[b] - synergyBaseCounts[a]);
-                sortedSynergyBases.forEach(b => {
+                const sortedAreaBases = Object.keys(areaBaseCounts).sort((a, b) => areaBaseCounts[b] - areaBaseCounts[a]);
+                sortedAreaBases.forEach(b => {
                     if (recommendedBases.length < 3) {
                         recommendedBases.push(b);
                     }
                 });
+            }
 
-                if (recommendedBases.length < 3) {
-                    const areaBaseCounts = {};
-                    otherWeapons.forEach(w => {
-                        if (!recommendedBases.includes(w.base_effect)) {
-                            areaBaseCounts[w.base_effect] = (areaBaseCounts[w.base_effect] || 0) + 1;
-                        }
-                    });
-                    const sortedAreaBases = Object.keys(areaBaseCounts).sort((a, b) => areaBaseCounts[b] - areaBaseCounts[a]);
-                    sortedAreaBases.forEach(b => {
-                        if (recommendedBases.length < 3) {
-                            recommendedBases.push(b);
-                        }
-                    });
-                }
-
-                if (recommendedBases.length < 3) {
-                    allBaseEffects.forEach(b => {
-                        if (recommendedBases.length < 3 && !recommendedBases.includes(b)) {
-                            recommendedBases.push(b);
-                        }
-                    });
-                }
+            if (recommendedBases.length < 3) {
+                allBaseEffects.forEach(b => {
+                    if (recommendedBases.length < 3 && !recommendedBases.includes(b)) {
+                        recommendedBases.push(b);
+                    }
+                });
             }
 
             const matchedWeaponsForFilter = simulateFilter(recommendedBases, recommendedExtraSkill);
             const totalWeaponsCount = weaponsInArea.length;
             const matchedCount = matchedWeaponsForFilter.length;
-
-            // Compute matches for the traditional list (showing matches between other weapons and selected weapon)
-            const matchedWeapons = [];
-            otherWeapons.forEach(w => {
-                let matchCount = 0;
-                const matches = { base: false, extra: false, skill: false };
-
-                if (w.base_effect && w.base_effect === selected.base_effect) {
-                    matchCount++;
-                    matches.base = true;
-                }
-                if (w.extra_effect && w.extra_effect === selected.extra_effect) {
-                    matchCount++;
-                    matches.extra = true;
-                }
-                if (w.skill_effect && w.skill_effect === selected.skill_effect) {
-                    matchCount++;
-                    matches.skill = true;
-                }
-
-                if (matchCount > 0) {
-                    matchedWeapons.push({
-                        weapon: w,
-                        matchCount,
-                        matches
-                    });
-                }
-            });
 
             // --- 2. RENDER AREA HEADER ---
             const areaHeader = document.createElement('div');
@@ -475,9 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
             titleGroup.appendChild(areaIcon);
             titleGroup.appendChild(areaNameSpan);
 
+            // 「一緒に狙える武器」の件数（本命武器を除いた適合武器数）
+            const otherMatchedCount = matchedWeaponsForFilter.filter(w => w.id !== selected.id).length;
             const countSummary = document.createElement('span');
             countSummary.className = 'matching-count-summary';
-            countSummary.textContent = `一致する武器: ${matchedWeapons.length}件`;
+            countSummary.textContent = `一緒に狙える武器: ${otherMatchedCount}件`;
 
             areaHeader.appendChild(titleGroup);
             areaHeader.appendChild(countSummary);
@@ -531,192 +433,179 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             areaContainer.appendChild(optimizerWrapper);
 
-            // --- 4. RENDER SYNERGY WEAPONS TREE ---
+            // --- 4. RENDER SYNERGY WEAPONS LIST ---
             const treeTitle = document.createElement('div');
             treeTitle.className = 'synergy-tree-title';
             treeTitle.style.fontSize = '0.75rem';
             treeTitle.style.color = 'var(--text-secondary)';
             treeTitle.style.fontWeight = '600';
             treeTitle.style.marginBottom = '0.5rem';
-            treeTitle.innerHTML = `▼ 効果一致する他の武器`;
+            treeTitle.innerHTML = `▼ このフィルター設定で出現する武器`;
             areaContainer.appendChild(treeTitle);
 
-            const hasAnyMatch = matchedWeapons.length > 0;
+            const mainWeapon = matchedWeaponsForFilter.find(w => w.id === selected.id);
+            const simultaneousWeapons = matchedWeaponsForFilter.filter(w => w.id !== selected.id);
 
-            if (!hasAnyMatch) {
-                const noMatch = document.createElement('div');
-                noMatch.className = 'no-match-state';
-                noMatch.innerHTML = `
-                    <i>🔍</i>
-                    <div>このエリアに効果が一致する他の武器はありません。</div>
+            const weaponsListWrapper = document.createElement('div');
+            weaponsListWrapper.className = 'match-groups-wrapper';
+
+            // 1. 本命ターゲットを表示
+            if (mainWeapon) {
+                const targetSection = document.createElement('div');
+                targetSection.className = 'match-group-section match-level-target';
+
+                const targetHeader = document.createElement('div');
+                targetHeader.className = 'match-group-header';
+                targetHeader.innerHTML = `
+                    <div class="match-group-title">
+                        <span class="match-group-indicator" style="background-color: var(--primary);"></span>
+                        <span class="match-group-label" style="color: var(--primary);">🎯 本命ターゲット</span>
+                    </div>
                 `;
-                areaContainer.appendChild(noMatch);
-            } else {
-                // Render match groups
-                const matchGroupsWrapper = document.createElement('div');
-                matchGroupsWrapper.className = 'match-groups-wrapper';
+                targetSection.appendChild(targetHeader);
 
-                // Display 3, then 2, then 1
-                [3, 2, 1].forEach(count => {
-                    const weaponsInGroup = matchedWeapons.filter(item => item.matchCount === count);
-                    if (weaponsInGroup.length === 0) return; // Only render if there are weapons in the group
+                const comboList = document.createElement('div');
+                comboList.className = 'combo-list';
 
-                    const groupSection = document.createElement('div');
-                    groupSection.className = `match-group-section match-level-${count}`;
+                const comboItem = document.createElement('div');
+                comboItem.className = 'combo-item';
+                comboItem.style.borderColor = 'var(--primary-glow-strong)';
 
-                    // Group Section Header
-                    const groupHeader = document.createElement('div');
-                    groupHeader.className = 'match-group-header';
+                const weaponsList = document.createElement('div');
+                weaponsList.className = 'combo-weapons-list';
+                weaponsList.style.paddingLeft = '0';
+                weaponsList.style.borderLeft = 'none';
+                weaponsList.style.marginLeft = '0';
 
-                    let badgeColor = '';
-                    if (count === 3) badgeColor = 'var(--rarity-6)';
-                    else if (count === 2) badgeColor = 'var(--rarity-5)';
-                    else badgeColor = 'var(--accent)';
+                const weaponRow = document.createElement('div');
+                weaponRow.className = `matching-weapon-row rarity-${mainWeapon.rarity}`;
+                weaponRow.setAttribute('data-id', mainWeapon.id);
+                weaponRow.style.background = 'rgba(242, 169, 0, 0.08)';
+                weaponRow.style.borderColor = 'rgba(242, 169, 0, 0.3)';
 
-                    groupHeader.innerHTML = `
-                        <div class="match-group-title">
-                            <span class="match-group-indicator" style="background-color: ${badgeColor};"></span>
-                            <span class="match-group-label">${count}個効果一致</span>
+                const effectDetails = [];
+                effectDetails.push(`基礎: ${mainWeapon.base_effect}`);
+                if (recommendedExtraSkill) {
+                    if (recommendedExtraSkill.type === 'extra') {
+                        effectDetails.push(`付加: ${mainWeapon.extra_effect}`);
+                    } else {
+                        effectDetails.push(`スキル: ${mainWeapon.skill_effect}`);
+                    }
+                }
+
+                weaponRow.innerHTML = `
+                    <div class="weapon-row-details">
+                        <div class="weapon-row-top">
+                            <span class="weapon-row-rarity">★${mainWeapon.rarity}</span>
+                            <span class="weapon-row-name" style="color: #fff; font-weight: 700;">${mainWeapon.weapon_name}</span>
+                            <span class="weapon-row-char" style="margin-left: auto;">${mainWeapon.character}</span>
                         </div>
-                        <span class="match-group-count">${weaponsInGroup.length}件</span>
-                    `;
-                    groupSection.appendChild(groupHeader);
+                        <div class="weapon-row-bottom" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                            <span>${effectDetails.join(' ｜ ')}</span>
+                        </div>
+                    </div>
+                `;
+                weaponsList.appendChild(weaponRow);
+                comboItem.appendChild(weaponsList);
+                comboList.appendChild(comboItem);
+                targetSection.appendChild(comboList);
+                weaponsListWrapper.appendChild(targetSection);
+            }
 
-                    // Group weapons inside this match count by matched combination
-                    const getComboKeyAndLabel = (matches) => {
-                        const keys = [];
-                        const labels = [];
-                        if (matches.base) {
-                            keys.push('base');
-                            labels.push(`基礎: ${selected.base_effect || '-'}`);
-                        }
-                        if (matches.extra) {
-                            keys.push('extra');
-                            labels.push(`付加: ${selected.extra_effect || '-'}`);
-                        }
-                        if (matches.skill) {
-                            keys.push('skill');
-                            labels.push(`スキル: ${selected.skill_effect || '-'}`);
-                        }
-                        
-                        return {
-                            key: keys.join(','),
-                            label: labels.join('、'),
-                            matches: { ...matches }
-                        };
-                    };
+            // 2. この組み合わせで一緒に狙える武器を表示
+            const simultaneousSection = document.createElement('div');
+            simultaneousSection.className = 'match-group-section match-level-simultaneous';
+            simultaneousSection.style.marginTop = '1rem';
 
-                    const combosMap = {};
-                    weaponsInGroup.forEach(item => {
-                        const combo = getComboKeyAndLabel(item.matches);
-                        const comboKey = combo.key;
-                        if (!combosMap[comboKey]) {
-                            combosMap[comboKey] = {
-                                key: comboKey,
-                                label: combo.label,
-                                matches: combo.matches,
-                                items: []
-                            };
-                        }
-                        combosMap[comboKey].items.push(item);
-                    });
+            const simultaneousHeader = document.createElement('div');
+            simultaneousHeader.className = 'match-group-header';
+            simultaneousHeader.innerHTML = `
+                <div class="match-group-title">
+                    <span class="match-group-indicator" style="background-color: var(--accent);"></span>
+                    <span class="match-group-label">📦 この組み合わせで一緒に狙える武器</span>
+                </div>
+                <span class="match-group-count">${simultaneousWeapons.length}件</span>
+            `;
+            simultaneousSection.appendChild(simultaneousHeader);
 
-                    // Sort combos in logical order by key
-                    const keyOrder = [
-                        'base,extra,skill',
-                        'base,extra',
-                        'base,skill',
-                        'extra,skill',
-                        'base',
-                        'extra',
-                        'skill'
-                    ];
+            const comboList = document.createElement('div');
+            comboList.className = 'combo-list';
 
-                    const combos = Object.values(combosMap);
-                    combos.sort((a, b) => {
-                        const idxA = keyOrder.indexOf(a.key);
-                        const idxB = keyOrder.indexOf(b.key);
-                        return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-                    });
+            if (simultaneousWeapons.length === 0) {
+                const noMatchItem = document.createElement('div');
+                noMatchItem.className = 'combo-item';
+                noMatchItem.innerHTML = `
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 0.5rem 0;">
+                        一緒に狙える他の武器はありません
+                    </div>
+                `;
+                comboList.appendChild(noMatchItem);
+            } else {
+                const comboItem = document.createElement('div');
+                comboItem.className = 'combo-item';
 
-                    // Container for combo nodes
-                    const comboList = document.createElement('div');
-                    comboList.className = 'combo-list';
+                const weaponsList = document.createElement('div');
+                weaponsList.className = 'combo-weapons-list';
+                weaponsList.style.paddingLeft = '0';
+                weaponsList.style.borderLeft = 'none';
+                weaponsList.style.marginLeft = '0';
 
-                    combos.forEach(combo => {
-                        // Sort weapons: type, rarity desc, then numeric ID
-                        combo.items.sort((a, b) => {
-                            // 1. Weapon Type Order
-                            const idxA = typeOrder.indexOf(a.weapon.weapon_type);
-                            const idxB = typeOrder.indexOf(b.weapon.weapon_type);
-                            const valA = idxA !== -1 ? idxA : 99;
-                            const valB = idxB !== -1 ? idxB : 99;
-                            if (valA !== valB) return valA - valB;
-
-                            // 2. Rarity Descending
-                            if (b.weapon.rarity !== a.weapon.rarity) {
-                                return b.weapon.rarity - a.weapon.rarity;
-                            }
-
-                            // 3. ID Ascending (numerical)
-                            return parseIdNum(a.weapon.id) - parseIdNum(b.weapon.id);
-                        });
-
-                        const comboItem = document.createElement('div');
-                        comboItem.className = 'combo-item';
-
-                        // Create combination label with tree connector └
-                        const comboHeader = document.createElement('div');
-                        comboHeader.className = 'combo-header';
-                        
-                        comboHeader.innerHTML = `
-                            <span class="connector-branch">└</span>
-                            <span class="combo-label">${combo.label}</span>
-                        `;
-                        comboItem.appendChild(comboHeader);
-
-                        // Create weapons list under this combination
-                        const weaponsList = document.createElement('div');
-                        weaponsList.className = 'combo-weapons-list';
-
-                        combo.items.forEach(item => {
-                            const w = item.weapon;
-                            const weaponRow = document.createElement('div');
-                            weaponRow.className = `matching-weapon-row rarity-${w.rarity}`;
-                            weaponRow.setAttribute('data-id', w.id);
-
-                            weaponRow.innerHTML = `
-                                <span class="sub-connector-branch">└</span>
-                                <div class="weapon-row-details">
-                                    <div class="weapon-row-top">
-                                        <span class="weapon-row-rarity">★${w.rarity}</span>
-                                        <span class="weapon-row-name">${w.weapon_name}</span>
-                                    </div>
-                                    <div class="weapon-row-bottom">
-                                        <span class="weapon-row-char">${w.character}</span>
-                                    </div>
-                                </div>
-                            `;
-
-                            // Click row to change selection
-                            weaponRow.addEventListener('click', () => {
-                                weaponSelect.value = w.id;
-                                handleWeaponChange(w.id);
-                            });
-
-                            weaponsList.appendChild(weaponRow);
-                        });
-
-                        comboItem.appendChild(weaponsList);
-                        comboList.appendChild(comboItem);
-                    });
-
-                    groupSection.appendChild(comboList);
-                    matchGroupsWrapper.appendChild(groupSection);
+                // Sort simultaneous weapons
+                simultaneousWeapons.sort((a, b) => {
+                    const idxA = typeOrder.indexOf(a.weapon_type);
+                    const idxB = typeOrder.indexOf(b.weapon_type);
+                    const valA = idxA !== -1 ? idxA : 99;
+                    const valB = idxB !== -1 ? idxB : 99;
+                    if (valA !== valB) return valA - valB;
+                    if (b.rarity !== a.rarity) return b.rarity - a.rarity;
+                    return parseIdNum(a.id) - parseIdNum(b.id);
                 });
 
-                areaContainer.appendChild(matchGroupsWrapper);
+                simultaneousWeapons.forEach(w => {
+                    const weaponRow = document.createElement('div');
+                    weaponRow.className = `matching-weapon-row rarity-${w.rarity}`;
+                    weaponRow.setAttribute('data-id', w.id);
+
+                    const matchedEffects = [];
+                    if (w.base_effect === selected.base_effect) matchedEffects.push(`基礎: ${w.base_effect}`);
+                    if (recommendedExtraSkill) {
+                        if (recommendedExtraSkill.type === 'extra' && w.extra_effect === recommendedExtraSkill.value) {
+                            matchedEffects.push(`付加: ${w.extra_effect}`);
+                        } else if (recommendedExtraSkill.type === 'skill' && w.skill_effect === recommendedExtraSkill.value) {
+                            matchedEffects.push(`スキル: ${w.skill_effect}`);
+                        }
+                    }
+
+                    weaponRow.innerHTML = `
+                        <div class="weapon-row-details">
+                            <div class="weapon-row-top">
+                                <span class="weapon-row-rarity">★${w.rarity}</span>
+                                <span class="weapon-row-name">${w.weapon_name}</span>
+                                <span class="weapon-row-char" style="margin-left: auto;">${w.character}</span>
+                            </div>
+                            <div class="weapon-row-bottom" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem; display: flex; justify-content: space-between; width: 100%;">
+                                <span>一致効果: ${matchedEffects.join(' ｜ ')}</span>
+                                <span style="opacity: 0.6;">${w.weapon_type}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    // Click row to change selection
+                    weaponRow.addEventListener('click', () => {
+                        weaponSelect.value = w.id;
+                        handleWeaponChange(w.id);
+                    });
+
+                    weaponsList.appendChild(weaponRow);
+                });
+
+                comboItem.appendChild(weaponsList);
+                comboList.appendChild(comboItem);
             }
+
+            simultaneousSection.appendChild(comboList);
+            weaponsListWrapper.appendChild(simultaneousSection);
+            areaContainer.appendChild(weaponsListWrapper);
 
             synergyResultsContainer.appendChild(areaContainer);
         });
