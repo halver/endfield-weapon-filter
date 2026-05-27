@@ -302,13 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const simulateFilter = (bases, es) => {
                 return weaponsInArea.filter(w => {
                     const baseMatches = bases.includes(w.base_effect);
-                    let esMatches = false;
-                    if (!es) {
-                        esMatches = true;
-                    } else {
-                        esMatches = (w.extra_effect === es.value || w.skill_effect === es.value);
-                    }
-                    return baseMatches && esMatches;
+                    const esMatches = es ? (w.extra_effect === es.value || w.skill_effect === es.value) : false;
+                    return baseMatches || esMatches;
                 });
             };
 
