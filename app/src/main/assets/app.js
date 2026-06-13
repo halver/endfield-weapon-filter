@@ -1215,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function checkAppUpdate(isManual) {
         if (!window.AndroidInterface) return;
 
-        const updateJsonUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json';
+        const updateJsonUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/395af6b459d5262bc89fc03b372d39217bb81edb/update.json';
 
         if (isManual) {
             updateStatusText.textContent = "アップデートを確認中...";
@@ -1241,16 +1241,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Bind update start button action
                     updateStartBtn.onclick = () => {
-                        const hasPermission = window.AndroidInterface.checkInstallPermission();
-                        if (!hasPermission) {
-                            window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
-                            window.AndroidInterface.requestInstallPermission();
-                            return;
+                        try {
+                            const hasPermission = window.AndroidInterface.checkInstallPermission();
+                            if (!hasPermission) {
+                                window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
+                                window.AndroidInterface.requestInstallPermission();
+                                return;
+                            }
+                            
+                            updateStatusText.textContent = "ダウンロード中...";
+                            updateStartBtn.disabled = true;
+                            
+                            if (!data || !data.apk_url) {
+                                throw new Error("APK URL is missing in update data");
+                            }
+                            
+                            window.AndroidInterface.startUpdate(data.apk_url);
+                        } catch (err) {
+                            console.error("Update click failed", err);
+                            if (window.AndroidInterface && window.AndroidInterface.showToast) {
+                                window.AndroidInterface.showToast("JS Error: " + err.message);
+                            } else {
+                                alert("JS Error: " + err.message);
+                            }
+                            updateStatusText.textContent = "エラーが発生しました";
+                            updateStartBtn.disabled = false;
                         }
-                        
-                        updateStatusText.textContent = "ダウンロード中...";
-                        updateStartBtn.disabled = true;
-                        window.AndroidInterface.startUpdate(data.apk_url);
                     };
                 } else {
                     if (isManual) {
