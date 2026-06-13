@@ -1185,4 +1185,106 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial render of database explorer
     applyFilters();
+
+    // ==========================================
+    // SECTION D: App Self-Update Logic (Android Only)
+    // ==========================================
+    const checkUpdateBtn = document.getElementById('check-update-btn');
+    const updateModal = document.getElementById('update-modal');
+    const closeUpdateModalBtn = document.getElementById('close-update-modal');
+    const updateCancelBtn = document.getElementById('update-cancel-btn');
+    const updateStartBtn = document.getElementById('update-start-btn');
+    const currentVersionText = document.getElementById('current-version-text');
+    const latestVersionText = document.getElementById('latest-version-text');
+    const updateStatusText = document.getElementById('update-status-text');
+
+    if (window.AndroidInterface) {
+        if (checkUpdateBtn) {
+            checkUpdateBtn.style.display = 'inline-flex';
+            checkUpdateBtn.addEventListener('click', () => {
+                checkAppUpdate(true);
+            });
+        }
+        
+        // Automatically check on startup (quietly) after 2 seconds
+        setTimeout(() => {
+            checkAppUpdate(false);
+        }, 2000);
+    }
+
+    function checkAppUpdate(isManual) {
+        if (!window.AndroidInterface) return;
+
+        const updateJsonUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json';
+
+        if (isManual) {
+            updateStatusText.textContent = "アップデートを確認中...";
+        }
+
+        fetch(updateJsonUrl, { cache: "no-store" })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+                return response.json();
+            })
+            .then(data => {
+                const currentCode = window.AndroidInterface.getVersionCode();
+                const latestCode = data.latest_version_code;
+
+                if (latestCode > currentCode) {
+                    // New version available
+                    currentVersionText.textContent = window.AndroidInterface.getVersionName() + ` (Code: ${currentCode})`;
+                    latestVersionText.textContent = data.latest_version_name + ` (Code: ${latestCode})`;
+                    updateStatusText.textContent = "";
+                    updateModal.classList.add('active');
+
+                    // Bind update start button action
+                    updateStartBtn.onclick = () => {
+                        const hasPermission = window.AndroidInterface.checkInstallPermission();
+                        if (!hasPermission) {
+                            window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
+                            window.AndroidInterface.requestInstallPermission();
+                            return;
+                        }
+                        
+                        updateStatusText.textContent = "ダウンロード中...";
+                        updateStartBtn.disabled = true;
+                        window.AndroidInterface.startUpdate(data.apk_url);
+                    };
+                } else {
+                    if (isManual) {
+                        window.AndroidInterface.showToast("アプリは最新バージョンです。");
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Update check failed", error);
+                if (isManual) {
+                    window.AndroidInterface.showToast("アップデートの確認に失敗しました。");
+                }
+            });
+    }
+
+    if (closeUpdateModalBtn) {
+        closeUpdateModalBtn.addEventListener('click', () => {
+            updateModal.classList.remove('active');
+            updateStartBtn.disabled = false;
+        });
+    }
+
+    if (updateCancelBtn) {
+        updateCancelBtn.addEventListener('click', () => {
+            updateModal.classList.remove('active');
+            updateStartBtn.disabled = false;
+        });
+    }
+
+    // Modal background click close
+    window.addEventListener('click', (e) => {
+        if (e.target === updateModal) {
+            updateModal.classList.remove('active');
+            updateStartBtn.disabled = false;
+        }
+    });
 });
