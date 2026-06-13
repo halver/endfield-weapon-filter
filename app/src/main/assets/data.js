@@ -854,7 +854,8 @@
         "character": "ミ・フ",
         "areas": [
             "中枢エリア",
-            "原石研究パーク"
+            "原石研究パーク",
+            "蔵剣谷"
         ],
         "base_effect": "筋力UP",
         "extra_effect": "攻撃力UP",
@@ -869,14 +870,49 @@
         "rarity": 6,
         "character": "カミーユ",
         "areas": [
-            "エネルギー高地",
             "中枢エリア",
-            "実験区域",
-            "首礎"
+            "エネルギー高地",
+            "首礎",
+            "実験区域"
         ],
         "base_effect": "敏捷UP",
         "extra_effect": "灼熱ダメージUP",
         "skill_effect": "流回",
+        "side": "left"
+    },
+    {
+        "id": "56",
+        "weapon_name": "ファントムペイン",
+        "weapon_type": "大剣",
+        "variant_type": "character_specific",
+        "rarity": 6,
+        "character": "汎用",
+        "areas": [
+            "中枢エリア",
+            "鉱山エリア",
+            "清波砦",
+            "実験区域"
+        ],
+        "base_effect": "筋力UP",
+        "extra_effect": "アーツ強度UP",
+        "skill_effect": "圧制",
+        "side": "left"
+    },
+    {
+        "id": "57",
+        "weapon_name": "灯火の使命",
+        "weapon_type": "長柄武器",
+        "variant_type": "character_specific",
+        "rarity": 6,
+        "character": "汎用",
+        "areas": [
+            "中枢エリア",
+            "原石研究パーク",
+            "首礎"
+        ],
+        "base_effect": "敏捷UP",
+        "extra_effect": "必殺技効率UP",
+        "skill_effect": "効率",
         "side": "left"
     }
 ];
