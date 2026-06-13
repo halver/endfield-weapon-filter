@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const baseBadgesHTML = recommendedBases.map(b => {
                 const isDummy = b !== selected.base_effect;
                 const badgeClass = isDummy ? 'opt-badge dummy-opt' : 'opt-badge base-opt';
-                const label = isDummy ? `${b} (ダミー)` : b;
+                const label = b;
                 return `<span class="${badgeClass}">${label}</span>`;
             }).join(' ');
 
@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const typeLabel = recommendedExtraSkill.type === 'extra' ? '付加' : 'スキル';
                 esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${recommendedExtraSkill.value}</span>`;
             } else {
-                esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし (ダミー)</span>`;
+                esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし</span>`;
             }
 
             const optimizerWrapper = document.createElement('div');
