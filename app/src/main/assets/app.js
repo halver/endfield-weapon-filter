@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (w.weapon_type) uniqueTypes.add(w.weapon_type);
     });
 
-    const areaOrder = ["中枢エリア", "原石研究パーク", "鉱山エリア", "エネルギー高地", "武陵城", "清波砦", "首礎", "実験区域"];
+    const areaOrder = ["中枢エリア", "原石研究パーク", "鉱山エリア", "エネルギー高地", "武陵城", "清波砦", "首礎", "実験区域", "蔵剣谷"];
     const sortedAreas = Array.from(uniqueAreas).sort((a, b) => {
         const idxA = areaOrder.indexOf(a);
         const idxB = areaOrder.indexOf(b);

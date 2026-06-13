@@ -108,13 +108,14 @@ header {
 }
 
 h1 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
     background: linear-gradient(135deg, #fff 0%, #ccc 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    white-space: nowrap;
 }
 
 .logo-sub {
@@ -139,15 +140,16 @@ h1 {
     border: none;
     color: var(--text-secondary);
     font-family: var(--font);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    padding: 0.6rem 1.2rem;
+    padding: 0.5rem 0.8rem;
     border-radius: 6px;
     cursor: pointer;
     transition: var(--transition);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    white-space: nowrap;
 }
 
 .tab-btn:hover {
