@@ -130,6 +130,12 @@ UI/UXデザインは、ゲーム公式ウェブサイト of ブランドカラ�
     #### [イメージ画像：武器データの編集モーダル（ドロップエリアソート）]
     ![編集モーダル](screenshots/edit_modal.png)
 
+*   **アプリのアップデートモーダル**:
+    *   外部 `update.json` や GitHub Release を参照し、アプリ内から新バージョンのAPKを直接ダウンロード＆インストールするダイアログ。
+    *   **リアルタイムダウンロード進捗表示**: %表記（`0%`～`100%`）、グラデーションプログレスバー、およびダウンロード済みファイル容量（`MB / MB`）をリアルタイム更新表示。
+    *   **開発・テスト用「強制再インストール」対応**: 手動更新確認時、同じバージョン番号（Code）であっても「⚡ 強制再インストール」ボタンが表示され、バージョン変更なしで最新ビルドのAPKを直接上書きインストール可能。
+    *   **詳細エラー通知**: 404エラー（URL不正・リポジトリ非公開）や通信失敗時、ダイアログおよびトーストで具体原因（例: HTTP 404）を表示。
+
 ---
 
 ## 4. データ仕様と永続化
@@ -158,11 +164,32 @@ UI/UXデザインは、ゲーム公式ウェブサイト of ブランドカラ�
 
 ### 5.2 アセット自動配置スクリプト
 *   [resize_icons.ps1](file:///C:/Users/yf-02/.gemini/antigravity/scratch/endfield-android-app/resize_icons.ps1):
-    ベース画像から各 mipmap フォルダへのリサイズ配置、アダプティブアイコンの削除、および競合 `webp` ファイルの一括削除を自动化する PowerShell スクリプト。
+    ベース画像から各 mipmap フォルダへのリサイズ配置、アダプティブアイコンの削除、および競合 `webp` ファイルの一括削除を自動化する PowerShell スクリプト。
+
+### 5.3 CI/CD および自動配信パイプライン仕様
+*   **GitHub Actions ワークフロー** ([.github/workflows/build-release.yml](file:///C:/Users/yf-02/.gemini/antigravity/scratch/endfield-android-app/.github/workflows/build-release.yml)):
+    *   プッシュ（`v*` タグ、`main` / `1.0.*` ブランチ）をトリガーとして、クラウド上の Ubuntu + JDK 17 環境で `./gradlew assembleDebug` を全自動実行。
+    *   ビルド成功後、GitHub Releases の `latest` タグへ生成された `endfield-weapon-filter-debug.apk` を自動アタッチし、恒久固定URL (`https://github.com/halver/endfield-weapon-filter/releases/download/latest/endfield-weapon-filter-debug.apk`) として全自動公開配信。
+*   **Google Drive 同期スクリプト** ([build_and_upload.ps1](file:///C:/Users/yf-02/.gemini/antigravity/scratch/endfield-android-app/build_and_upload.ps1)):
+    *   PowerShell環境においてワンコマンドで「自動ビルド ➔ Google Drive for Desktop (マイドライブ) への自動コピー」を一括実行するローカル同期用スクリプト。
 
 ---
 
 ## 6. 改訂履歴
+
+### v1.0.3
+*   **リアルタイムダウンロード進捗表示（% / プログレスバー / MB容量表示）**:
+    *   アプリアップデート実行中に、パーセント（`%`）、グラデーションプログレスバー、およびダウンロード済み容量（`MB / MB`）をリアルタイムで視覚表示する機能を実装。
+*   **開発・テスト用「強制再インストール」機能**:
+    *   手動更新確認時、バージョン番号を変更することなく最新ビルドのAPKを即座に上書きダウンロード・再インストールできる開発補助機能を実装。
+*   **詳細な通信エラーハンドリング（404通知等）**:
+    *   URL不正や非公開リポジトリによるダウンロード失敗時に `HTTP 404` 等の具体的エラー理由をダイアログ・トースト表示する機能を追加。
+*   **Android Native File Saver (`saveFile`)**:
+    *   Android実機上で「CSV出力」等を行った際、端末標準の「Download (ダウンロード)」フォルダへファイルを直接保存・通知するネイティブ連携処理を実装。
+*   **GitHub Actions CI/CD パイプラインの構築**:
+    *   Gitプッシュ時にクラウド上で自動ビルドを行い、GitHub Releases 経由で固定公開URLへ自動配信するワークフローを追加。
+*   **Google Drive 自動同期スクリプト (`build_and_upload.ps1`)**:
+    *   ビルドからパソコン版 Google ドライブへのコピーまでを一括全自動化するPowerShellスクリプトを追加。
 
 ### v1.0.2
 *   **Googleスプレッドシート直接編集・リアルタイム同期機能**:
