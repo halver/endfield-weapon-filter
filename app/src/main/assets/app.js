@@ -1549,12 +1549,26 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 const currentCode = window.AndroidInterface.getVersionCode();
                 const latestCode = data.latest_version_code;
+                const isNewer = latestCode > currentCode;
 
-                if (latestCode > currentCode) {
-                    // New version available
+                if (isNewer || isManual) {
                     currentVersionText.textContent = window.AndroidInterface.getVersionName() + ` (Code: ${currentCode})`;
                     latestVersionText.textContent = data.latest_version_name + ` (Code: ${latestCode})`;
-                    updateStatusText.textContent = "";
+                    
+                    const modalTitle = updateModal ? updateModal.querySelector('.modal-header h2') : null;
+                    if (modalTitle) {
+                        modalTitle.textContent = isNewer ? "✨ アプリのアップデート" : "⚡ アプリの再インストール (開発・テスト用)";
+                    }
+
+                    if (isNewer) {
+                        updateStatusText.textContent = "新しいバージョンが利用可能です！";
+                        updateStartBtn.textContent = "アップデート実行";
+                    } else {
+                        updateStatusText.textContent = "最新バージョンがインストール済みです。開発・テスト用に最新ビルドのAPKを上書きインストールできます。";
+                        updateStartBtn.textContent = "⚡ 強制再インストール";
+                    }
+
+                    updateStartBtn.disabled = false;
                     updateModal.classList.add('active');
 
                     // Bind update start button action
@@ -1586,10 +1600,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateStartBtn.disabled = false;
                         }
                     };
-                } else {
-                    if (isManual) {
-                        window.AndroidInterface.showToast("アプリは最新バージョンです。");
-                    }
                 }
             })
             .catch(error => {
