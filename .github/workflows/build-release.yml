@@ -41,16 +41,14 @@ jobs:
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "Latest Build (v1.0.3)"
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
           body: |
             🤖 GitHub Actions による自動ビルドAPKです。
             コミット: ${{ github.sha }}
-            ブランチ: ${{ github.ref_name }}
+            ブランチ/タグ: ${{ github.ref_name }}
           draft: false
           prerelease: false
-          overwrite: true
-          make_latest: true
           files: |
             endfield-weapon-filter-debug.apk
         env:
