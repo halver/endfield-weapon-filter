@@ -50,6 +50,8 @@ jobs:
             ブランチ: ${{ github.ref_name }}
           draft: false
           prerelease: false
+          overwrite: true
+          make_latest: true
           files: |
             endfield-weapon-filter-debug.apk
         env:
@@ -57,26 +59,13 @@ jobs:
 
       - name: Automatically Update Gist (update.json)
         if: success()
+        continue-on-error: true
         run: |
-          VERSION_CODE=$(jq -r '.latest_version_code' update.json)
-          VERSION_NAME=$(jq -r '.latest_version_name' update.json)
-          APK_URL=$(jq -r '.apk_url' update.json)
-
-          PAYLOAD=$(jq -n \
-            --arg vc "$VERSION_CODE" \
-            --arg vn "$VERSION_NAME" \
-            --arg url "$APK_URL" \
-            '{
-              files: {
-                "update.json": {
-                  content: "{\n  \"latest_version_code\": \($vc),\n  \"latest_version_name\": \"\($vn)\",\n  \"apk_url\": \"\($url)\"\n}"
-                }
-              }
-            }')
-
-          curl -s -X PATCH \
+          UPDATE_CONTENT=$(cat update.json)
+          PAYLOAD=$(jq -n --arg content "$UPDATE_CONTENT" '{files: {"update.json": {content: $content}}}')
+          curl -s -f -X PATCH \
             -H "Authorization: token ${{ secrets.GIST_PAT || secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             https://api.github.com/gists/b65e2036929f618ca9799bfa7ec1d9c9 \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD" || echo "Gist sync skipped or failed"
