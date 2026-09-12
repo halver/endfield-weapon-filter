@@ -256,6 +256,41 @@ class AndroidInterface(private val context: Context) {
             showToast("インストーラーの起動に失敗しました。設定を確認してください。")
         }
     }
+
+    @JavascriptInterface
+    fun saveFile(fileName: String, content: String, mimeType: String) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val resolver = context.contentResolver
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, if (mimeType.isNotBlank()) mimeType else "text/csv")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri != null) {
+                        resolver.openOutputStream(uri)?.use { os ->
+                            os.write(content.toByteArray(Charsets.UTF_8))
+                        }
+                        showToast("「ダウンロード」フォルダに保存しました: $fileName")
+                    } else {
+                        showToast("ファイルの保存に失敗しました。")
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                    if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                    val file = File(downloadsDir, fileName)
+                    file.writeText(content, Charsets.UTF_8)
+                    showToast("「ダウンロード」フォルダに保存しました: $fileName")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AndroidInterface", "saveFile failed", e)
+                showToast("保存エラー: ${e.message}")
+            }
+        }
+    }
 }
 
 private open class LocalContentWebViewClient(private val assetLoader: WebViewAssetLoader) : WebViewClientCompat() {

@@ -1124,23 +1124,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function downloadOrSaveFile(fileName, content, mimeType = 'text/csv') {
+        if (window.AndroidInterface && window.AndroidInterface.saveFile) {
+            window.AndroidInterface.saveFile(fileName, content, mimeType);
+        } else {
+            const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
     // Export data.js file
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
             // Format the database array nicely
             const prettyJson = JSON.stringify(sourceData, null, 4);
             const fileContent = `const WEAPONS_DATA = ${prettyJson};`;
-            
-            const blob = new Blob([fileContent], { type: 'text/javascript;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", "data.js");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadOrSaveFile('data.js', fileContent, 'text/javascript');
         });
     }
 
@@ -1345,16 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportCsvBtn) {
         exportCsvBtn.addEventListener('click', () => {
             const csvText = generateCSVData(sourceData);
-            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", "endfield_weapons.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadOrSaveFile('endfield_weapons.csv', csvText, 'text/csv');
         });
     }
 
@@ -1417,16 +1415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (gsheetTemplateBtn) {
         gsheetTemplateBtn.addEventListener('click', () => {
             const csvText = generateCSVData(sourceData);
-            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", "endfield_weapons_template.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadOrSaveFile('endfield_weapons_template.csv', csvText, 'text/csv');
         });
     }
 
