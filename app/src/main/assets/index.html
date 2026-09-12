@@ -187,18 +187,28 @@
                     <span>➕</span> 新規武器追加
                 </button>
                 <div class="db-data-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button id="export-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent);">
-                        <span>📥</span> エクスポート(data.js)
+                    <button id="gsheet-sync-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(15, 157, 88, 0.15); border-color: #0f9d58; color: #57d28d; font-weight: 600;">
+                        <span>🟩</span> スプレッドシート連携
                     </button>
-                    <label for="import-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-                        <span>📤</span> インポート(JSON)
+                    <button id="export-csv-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent);">
+                        <span>📊</span> CSV出力
+                    </button>
+                    <label for="import-csv-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <span>📈</span> CSV取り込み
+                        <input type="file" id="import-csv-file" accept=".csv" style="display: none;">
+                    </label>
+                    <button id="export-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.2); color: var(--text-secondary);">
+                        <span>📥</span> JS出力
+                    </button>
+                    <label for="import-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.2); color: var(--text-secondary);">
+                        <span>📤</span> JSON取込
                         <input type="file" id="import-file" accept=".json,.js" style="display: none;">
                     </label>
                     <button id="reset-db-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 71, 0, 0.1); border-color: rgba(255, 71, 0, 0.3); color: var(--rarity-6);">
-                        <span>🔄</span> 初期設定に戻す
+                        <span>🔄</span> リセット
                     </button>
                     <button id="check-update-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(242, 169, 0, 0.1); border-color: rgba(242, 169, 0, 0.3); color: var(--primary); display: none;">
-                        <span>✨</span> アプリ更新確認
+                        <span>✨</span> 更新確認
                     </button>
                 </div>
             </div>
@@ -332,6 +342,49 @@
                     <button type="submit" id="save-btn" class="reset-btn" style="flex: 1; background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">保存</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Google Sheets Sync Popup Modal -->
+    <div id="gsheet-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 520px; height: auto; max-height: 90vh;">
+            <div class="modal-header">
+                <h2>🟩 Googleスプレッドシート連携</h2>
+                <button class="close-modal-btn" id="close-gsheet-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="gap: 1rem;">
+                <p style="font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary);">
+                    Googleスプレッドシートで直接編集・追加した武器データをアプリに同期します。
+                </p>
+
+                <div class="input-group">
+                    <label for="gsheet-url-input">スプレッドシートURL（共有リンク または Web公開CSV）</label>
+                    <input type="url" id="gsheet-url-input" class="form-control" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="font-size: 0.85rem;">
+                    <div style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.3rem;">
+                        ※共有設定を「リンクを知っている全員が閲覧可能」に設定したスプレッドシートのURLを貼り付けてください。
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.6rem; background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+                    <input type="checkbox" id="gsheet-autosync-check" style="width: 18px; height: 18px; cursor: pointer; accent-color: #0f9d58;">
+                    <label for="gsheet-autosync-check" style="font-size: 0.88rem; cursor: pointer; user-select: none;">
+                        アプリ起動時にスプレッドシートから自動同期する
+                    </label>
+                </div>
+
+                <div id="gsheet-status-text" style="font-size: 0.85rem; min-height: 1.2rem; font-weight: 600; padding: 0.55rem; border-radius: 4px; display: none;"></div>
+
+                <div style="background: rgba(15, 157, 88, 0.08); padding: 0.85rem; border-radius: 6px; border: 1px solid rgba(15, 157, 88, 0.3); font-size: 0.8rem; line-height: 1.6;">
+                    <strong style="color: #57d28d; display: block; margin-bottom: 0.3rem;">💡 簡単セットアップガイド</strong>
+                    1. 現在のデータを <button type="button" id="gsheet-template-btn" style="background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 0.8rem; padding: 0;">テンプレートCSVとして保存</button> します。<br>
+                    2. Googleドライブにアップロードし「スプレッドシートとして開く」で直接編集を開始します。<br>
+                    3. スプレッドシートの「共有」設定で「リンクを知っている全員」にしてURLを上の枠に貼り付け、「今すぐ同期」を押してください！
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.25rem;">
+                <button id="close-gsheet-btn" class="reset-btn" style="flex: 1;">閉じる</button>
+                <button id="gsheet-sync-now-btn" class="reset-btn" style="flex: 1; background: #0f9d58; color: #fff; font-weight: 700; border-color: #0f9d58;">今すぐ同期</button>
+            </div>
         </div>
     </div>
 

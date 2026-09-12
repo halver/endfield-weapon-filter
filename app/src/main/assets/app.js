@@ -1179,6 +1179,324 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ==========================================
+    // SECTION E: CSV & Google Sheets Integration
+    // ==========================================
+    function parseCSVText(csvText) {
+        const lines = [];
+        let curLine = [];
+        let curToken = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < csvText.length; i++) {
+            const c = csvText[i];
+            const nextC = csvText[i + 1];
+
+            if (c === '"') {
+                if (inQuotes && nextC === '"') {
+                    curToken += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (c === ',' && !inQuotes) {
+                curLine.push(curToken.trim());
+                curToken = '';
+            } else if ((c === '\r' || c === '\n') && !inQuotes) {
+                if (c === '\r' && nextC === '\n') i++;
+                curLine.push(curToken.trim());
+                if (curLine.length > 0 && curLine.some(cell => cell.length > 0)) {
+                    lines.push(curLine);
+                }
+                curLine = [];
+                curToken = '';
+            } else {
+                curToken += c;
+            }
+        }
+        if (curToken.length > 0 || curLine.length > 0) {
+            curLine.push(curToken.trim());
+            if (curLine.some(cell => cell.length > 0)) {
+                lines.push(curLine);
+            }
+        }
+        return lines;
+    }
+
+    function convertCsvRowsToWeapons(csvRows) {
+        if (!csvRows || csvRows.length < 2) {
+            throw new Error("CSVデータが空であるか、有効なデータ行がありません。");
+        }
+
+        const rawHeaders = csvRows[0].map(h => h.toLowerCase().replace(/[\s_\-★]/g, ''));
+        const headerIndices = {
+            weapon_name: rawHeaders.findIndex(h => h.includes('武器名') || h.includes('weaponname') || h.includes('name')),
+            weapon_type: rawHeaders.findIndex(h => h.includes('武器種') || h.includes('weapontype') || h.includes('type')),
+            rarity: rawHeaders.findIndex(h => h.includes('レアリティ') || h.includes('rarity') || h.includes('star')),
+            character: rawHeaders.findIndex(h => h.includes('モチーフ') || h.includes('キャラ') || h.includes('character') || h.includes('owner')),
+            areas: rawHeaders.findIndex(h => h.includes('入手エリア') || h.includes('エリア') || h.includes('areas') || h.includes('area')),
+            base_effect: rawHeaders.findIndex(h => h.includes('基礎効果') || h.includes('基礎') || h.includes('baseeffect') || h.includes('base')),
+            extra_effect: rawHeaders.findIndex(h => h.includes('付加効果') || h.includes('付加') || h.includes('extraeffect') || h.includes('extra')),
+            skill_effect: rawHeaders.findIndex(h => h.includes('スキル効果') || h.includes('スキル') || h.includes('skilleffect') || h.includes('skill'))
+        };
+
+        if (headerIndices.weapon_name === -1) {
+            throw new Error("CSVヘッダーに「武器名」(weapon_name) が見つかりませんでした。");
+        }
+
+        const result = [];
+        for (let i = 1; i < csvRows.length; i++) {
+            const row = csvRows[i];
+            if (!row || row.length === 0) continue;
+            
+            const name = row[headerIndices.weapon_name];
+            if (!name) continue;
+
+            const type = (headerIndices.weapon_type !== -1 && row[headerIndices.weapon_type]) ? row[headerIndices.weapon_type] : '片手剣';
+            const rarityVal = (headerIndices.rarity !== -1 && row[headerIndices.rarity]) ? parseInt(row[headerIndices.rarity], 10) : 5;
+            const charVal = (headerIndices.character !== -1 && row[headerIndices.character]) ? row[headerIndices.character] : '汎用';
+            
+            let areasList = [];
+            if (headerIndices.areas !== -1 && row[headerIndices.areas]) {
+                const rawAreas = row[headerIndices.areas];
+                areasList = rawAreas.split(/[;,；,、\n]/).map(a => a.trim()).filter(a => a.length > 0);
+            }
+
+            const baseVal = headerIndices.base_effect !== -1 ? (row[headerIndices.base_effect] || '') : '';
+            const extraVal = headerIndices.extra_effect !== -1 ? (row[headerIndices.extra_effect] || '') : '';
+            const skillVal = headerIndices.skill_effect !== -1 ? (row[headerIndices.skill_effect] || '') : '';
+
+            const variantType = (charVal === '汎用' || !charVal) ? 'generic' : 'character_specific';
+
+            result.push({
+                id: String(i),
+                weapon_name: name,
+                weapon_type: type,
+                variant_type: variantType,
+                rarity: isNaN(rarityVal) ? 5 : rarityVal,
+                character: charVal,
+                areas: areasList,
+                base_effect: baseVal,
+                extra_effect: extraVal,
+                skill_effect: skillVal
+            });
+        }
+
+        if (result.length === 0) {
+            throw new Error("有効な武器データが1件も見つかりませんでした。");
+        }
+
+        return result;
+    }
+
+    function generateCSVData(weapons) {
+        const headers = ["武器名", "武器種", "レアリティ", "モチーフキャラ", "入手エリア", "基礎効果", "付加効果", "スキル効果"];
+        const rows = [headers];
+
+        weapons.forEach(w => {
+            const areasStr = (w.areas && Array.isArray(w.areas)) ? w.areas.join('; ') : '';
+            rows.push([
+                w.weapon_name || '',
+                w.weapon_type || '',
+                w.rarity || 5,
+                w.character || '汎用',
+                areasStr,
+                w.base_effect || '',
+                w.extra_effect || '',
+                w.skill_effect || ''
+            ]);
+        });
+
+        const csvContent = rows.map(r => r.map(cell => {
+            const str = String(cell);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }).join(',')).join('\r\n');
+
+        return '\uFEFF' + csvContent;
+    }
+
+    function convertGSheetUrlToCsvUrl(rawUrl) {
+        if (!rawUrl) return '';
+        let url = rawUrl.trim();
+
+        if (url.includes('/pub?') && url.includes('output=csv')) {
+            return url;
+        }
+
+        const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (sheetIdMatch && sheetIdMatch[1]) {
+            const sheetId = sheetIdMatch[1];
+            let gid = '0';
+            const gidMatch = url.match(/[?&]gid=([0-9]+)/) || url.match(/#gid=([0-9]+)/);
+            if (gidMatch && gidMatch[1]) {
+                gid = gidMatch[1];
+            }
+            return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+        }
+
+        return url;
+    }
+
+    // CSV Export Button
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+            const csvText = generateCSVData(sourceData);
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "endfield_weapons.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    // CSV Import Input
+    const importCsvFile = document.getElementById('import-csv-file');
+    if (importCsvFile) {
+        importCsvFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const text = event.target.result;
+                    const rows = parseCSVText(text);
+                    const parsedWeapons = convertCsvRowsToWeapons(rows);
+
+                    localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(parsedWeapons));
+                    alert(`CSVから${parsedWeapons.length}件の武器データをインポートしました！`);
+                    window.location.reload();
+                } catch (err) {
+                    console.error("CSV Parse Error:", err);
+                    alert("CSVのインポートに失敗しました: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // Google Sheets Modal & Sync Logic
+    const gsheetSyncBtn = document.getElementById('gsheet-sync-btn');
+    const gsheetModal = document.getElementById('gsheet-modal');
+    const closeGsheetModalBtn = document.getElementById('close-gsheet-modal');
+    const closeGsheetBtn = document.getElementById('close-gsheet-btn');
+    const gsheetUrlInput = document.getElementById('gsheet-url-input');
+    const gsheetAutosyncCheck = document.getElementById('gsheet-autosync-check');
+    const gsheetSyncNowBtn = document.getElementById('gsheet-sync-now-btn');
+    const gsheetTemplateBtn = document.getElementById('gsheet-template-btn');
+    const gsheetStatusText = document.getElementById('gsheet-status-text');
+
+    // Load saved GS settings
+    const savedGSheetUrl = localStorage.getItem('ENDFIELD_GSHEET_URL') || '';
+    const savedAutoSync = localStorage.getItem('ENDFIELD_GSHEET_AUTOSYNC') === 'true';
+
+    if (gsheetUrlInput) gsheetUrlInput.value = savedGSheetUrl;
+    if (gsheetAutosyncCheck) gsheetAutosyncCheck.checked = savedAutoSync;
+
+    if (gsheetSyncBtn && gsheetModal) {
+        gsheetSyncBtn.addEventListener('click', () => {
+            gsheetModal.classList.add('active');
+        });
+    }
+
+    const closeGsheet = () => {
+        if (gsheetModal) gsheetModal.classList.remove('active');
+    };
+    if (closeGsheetModalBtn) closeGsheetModalBtn.addEventListener('click', closeGsheet);
+    if (closeGsheetBtn) closeGsheetBtn.addEventListener('click', closeGsheet);
+
+    if (gsheetTemplateBtn) {
+        gsheetTemplateBtn.addEventListener('click', () => {
+            const csvText = generateCSVData(sourceData);
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "endfield_weapons_template.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    async function syncFromGoogleSheet(isManual = true) {
+        const rawUrl = gsheetUrlInput ? gsheetUrlInput.value.trim() : (localStorage.getItem('ENDFIELD_GSHEET_URL') || '');
+        if (!rawUrl) {
+            if (isManual) alert("GoogleスプレッドシートのURLを入力してください。");
+            return;
+        }
+
+        const csvUrl = convertGSheetUrlToCsvUrl(rawUrl);
+
+        // Save URL and auto sync pref
+        localStorage.setItem('ENDFIELD_GSHEET_URL', rawUrl);
+        if (gsheetAutosyncCheck) {
+            localStorage.setItem('ENDFIELD_GSHEET_AUTOSYNC', gsheetAutosyncCheck.checked ? 'true' : 'false');
+        }
+
+        if (gsheetStatusText) {
+            gsheetStatusText.style.display = 'block';
+            gsheetStatusText.style.background = 'rgba(0, 210, 255, 0.1)';
+            gsheetStatusText.style.color = 'var(--accent)';
+            gsheetStatusText.textContent = '⏳ スプレッドシートからデータを取得中...';
+        }
+        if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
+
+        try {
+            const res = await fetch(csvUrl, { cache: "no-store" });
+            if (!res.ok) {
+                throw new Error(`HTTP Error ${res.status}: データへのアクセスに失敗しました。アクセス権限を確認してください。`);
+            }
+            const csvText = await res.text();
+            const rows = parseCSVText(csvText);
+            const weapons = convertCsvRowsToWeapons(rows);
+
+            localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(weapons));
+
+            if (gsheetStatusText) {
+                gsheetStatusText.style.background = 'rgba(15, 157, 88, 0.2)';
+                gsheetStatusText.style.color = '#57d28d';
+                gsheetStatusText.textContent = `✅ 同期成功！ ${weapons.length} 件の武器データを更新しました。`;
+            }
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+
+        } catch (err) {
+            console.error("GSheet Sync Error:", err);
+            if (gsheetStatusText) {
+                gsheetStatusText.style.display = 'block';
+                gsheetStatusText.style.background = 'rgba(255, 71, 0, 0.2)';
+                gsheetStatusText.style.color = '#ff6b6b';
+                gsheetStatusText.textContent = `❌ 同期エラー: ${err.message}`;
+            }
+            if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = false;
+        }
+    }
+
+    if (gsheetSyncNowBtn) {
+        gsheetSyncNowBtn.addEventListener('click', () => {
+            syncFromGoogleSheet(true);
+        });
+    }
+
+    // Auto sync on startup if enabled
+    if (savedAutoSync && savedGSheetUrl) {
+        syncFromGoogleSheet(false);
+    }
+
     // Initialize Editor tab displays
     populateSuggestions();
     populateAreasChecklist();
