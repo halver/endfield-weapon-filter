@@ -1586,8 +1586,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return response.json();
             })
             .then(data => {
-                const currentCode = window.AndroidInterface.getVersionCode();
-                const latestCode = data.latest_version_code;
+                const currentCode = parseInt(window.AndroidInterface.getVersionCode(), 10) || 0;
+                const latestCode = parseInt(data.latest_version_code, 10) || 0;
                 const isNewer = latestCode > currentCode;
 
                 if (isNewer || isManual) {
