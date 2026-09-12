@@ -1602,9 +1602,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isNewer) {
                         updateStatusText.textContent = "新しいバージョンが利用可能です！";
                         updateStartBtn.textContent = "アップデート実行";
+                        updateStartBtn.style.display = 'inline-block';
                     } else {
-                        updateStatusText.textContent = "最新バージョンがインストール済みです。開発・テスト用に最新ビルドのAPKを上書きインストールできます。";
-                        updateStartBtn.textContent = "⚡ 強制再インストール";
+                        updateStatusText.textContent = `お使いのアプリは最新です (${window.AndroidInterface.getVersionName()})。新バージョンが配信された際にここからアップデートできます。`;
+                        updateStartBtn.style.display = 'none';
                     }
 
                     updateStartBtn.disabled = false;
