@@ -404,6 +404,16 @@
                 <div id="update-status-text" style="font-size: 0.85rem; color: var(--accent); min-height: 1.2rem; font-weight: 500;">
                     <!-- Status updates here -->
                 </div>
+                <!-- Update Progress Bar Container -->
+                <div id="update-progress-container" style="display: none; flex-direction: column; gap: 0.4rem; background: rgba(0, 0, 0, 0.25); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+                        <span id="update-progress-text" style="font-weight: 700; color: var(--accent);">0%</span>
+                        <span id="update-size-text" style="font-size: 0.75rem; opacity: 0.8; color: var(--text-secondary);">0.0 MB / 0.0 MB</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <div id="update-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00d2ff, #0f9d58); transition: width 0.15s ease;"></div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="padding: 1rem 1.25rem;">
                 <button id="update-cancel-btn" class="reset-btn" style="flex: 1;">キャンセル</button>

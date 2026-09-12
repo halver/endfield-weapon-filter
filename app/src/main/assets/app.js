@@ -1505,6 +1505,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const latestVersionText = document.getElementById('latest-version-text');
     const updateStatusText = document.getElementById('update-status-text');
 
+    const updateProgressContainer = document.getElementById('update-progress-container');
+    const updateProgressText = document.getElementById('update-progress-text');
+    const updateSizeText = document.getElementById('update-size-text');
+    const updateProgressBar = document.getElementById('update-progress-bar');
+
+    function resetUpdateProgress() {
+        if (updateProgressContainer) updateProgressContainer.style.display = 'none';
+        if (updateProgressBar) updateProgressBar.style.width = '0%';
+        if (updateProgressText) updateProgressText.textContent = '0%';
+        if (updateSizeText) updateSizeText.textContent = '0.0 MB / 0.0 MB';
+    }
+
+    window.onUpdateProgress = function(percent, downloadedBytes, totalBytes) {
+        if (updateProgressContainer) {
+            updateProgressContainer.style.display = 'flex';
+        }
+
+        if (percent >= 0) {
+            if (updateProgressBar) updateProgressBar.style.width = percent + '%';
+            if (updateProgressText) updateProgressText.textContent = percent + '%';
+        } else {
+            if (updateProgressText) updateProgressText.textContent = 'ダウンロード中...';
+        }
+
+        if (downloadedBytes && totalBytes && totalBytes > 0) {
+            const downloadedMB = (downloadedBytes / (1024 * 1024)).toFixed(1);
+            const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
+            if (updateSizeText) updateSizeText.textContent = `${downloadedMB} MB / ${totalMB} MB`;
+        } else if (downloadedBytes) {
+            const downloadedMB = (downloadedBytes / (1024 * 1024)).toFixed(1);
+            if (updateSizeText) updateSizeText.textContent = `${downloadedMB} MB`;
+        }
+
+        if (percent === 100) {
+            if (updateStatusText) updateStatusText.textContent = "ダウンロード完了。インストールを開始します...";
+        }
+    };
+
     if (window.AndroidInterface) {
         if (checkUpdateBtn) {
             checkUpdateBtn.style.display = 'inline-flex';
@@ -1527,6 +1565,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isManual) {
             updateStatusText.textContent = "アップデートを確認中...";
         }
+
+        resetUpdateProgress();
 
         fetch(updateJsonUrl, { cache: "no-store" })
             .then(response => {
@@ -1558,6 +1598,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     updateStartBtn.disabled = false;
+                    resetUpdateProgress();
                     updateModal.classList.add('active');
 
                     // Bind update start button action
@@ -1572,6 +1613,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             
                             updateStatusText.textContent = "ダウンロード中...";
                             updateStartBtn.disabled = true;
+                            resetUpdateProgress();
+                            if (updateProgressContainer) updateProgressContainer.style.display = 'flex';
                             
                             if (!data || !data.apk_url) {
                                 throw new Error("APK URL is missing in update data");
@@ -1603,6 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeUpdateModalBtn.addEventListener('click', () => {
             updateModal.classList.remove('active');
             updateStartBtn.disabled = false;
+            resetUpdateProgress();
         });
     }
 
@@ -1610,6 +1654,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCancelBtn.addEventListener('click', () => {
             updateModal.classList.remove('active');
             updateStartBtn.disabled = false;
+            resetUpdateProgress();
         });
     }
 
@@ -1618,6 +1663,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === updateModal) {
             updateModal.classList.remove('active');
             updateStartBtn.disabled = false;
+            resetUpdateProgress();
         }
     });
 });

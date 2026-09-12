@@ -94,8 +94,9 @@ class MainActivity : ComponentActivity() {
                                 settings.allowContentAccess = false
                                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
 
-                                // Bind the JavaScript interface
-                                addJavascriptInterface(AndroidInterface(context), "AndroidInterface")
+                                var activeWebView: WebView? = null
+                                activeWebView = this
+                                addJavascriptInterface(AndroidInterface(context) { activeWebView }, "AndroidInterface")
 
                                 loadUrl("https://appassets.androidplatform.net/assets/index.html")
                                 webView = this
@@ -108,7 +109,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-class AndroidInterface(private val context: Context) {
+class AndroidInterface(private val context: Context, private val getWebView: () -> WebView? = { null }) {
 
     @JavascriptInterface
     fun getVersionCode(): Int {
@@ -203,6 +204,7 @@ class AndroidInterface(private val context: Context) {
                 return false
             }
 
+            val fileLength = connection.contentLength
             val apkDir = File(context.cacheDir, "apks")
             if (!apkDir.exists()) {
                 apkDir.mkdirs()
@@ -213,13 +215,32 @@ class AndroidInterface(private val context: Context) {
                 apkFile.delete()
             }
 
-            android.util.Log.d("AndroidInterface", "Downloading bytes to ${apkFile.absolutePath}...")
+            android.util.Log.d("AndroidInterface", "Downloading bytes to ${apkFile.absolutePath}... (Content-Length: $fileLength)")
             connection.inputStream.use { input ->
                 FileOutputStream(apkFile).use { output ->
-                    val buffer = ByteArray(4096)
+                    val buffer = ByteArray(8192)
                     var bytesRead: Int
+                    var totalBytesRead = 0L
+                    var lastReportTime = 0L
+
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastReportTime > 100 || (fileLength > 0 && totalBytesRead == fileLength.toLong())) {
+                            lastReportTime = now
+                            val progress = if (fileLength > 0) ((totalBytesRead * 100) / fileLength).toInt() else -1
+                            val currentRead = totalBytesRead
+                            val totalSize = fileLength.toLong()
+
+                            Handler(Looper.getMainLooper()).post {
+                                getWebView()?.evaluateJavascript(
+                                    "if(window.onUpdateProgress) window.onUpdateProgress($progress, $currentRead, $totalSize);",
+                                    null
+                                )
+                            }
+                        }
                     }
                 }
             }
