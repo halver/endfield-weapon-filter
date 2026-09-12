@@ -354,14 +354,16 @@
             </div>
             <div class="modal-body" style="gap: 1rem;">
                 <p style="font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary);">
-                    Googleスプレッドシートで直接編集・追加した武器データをアプリに同期します。
+                    オンラインのGoogleスプレッドシートから最新の武器データを同期します。
                 </p>
 
-                <div class="input-group">
-                    <label for="gsheet-url-input">スプレッドシートURL（共有リンク または Web公開CSV）</label>
-                    <input type="url" id="gsheet-url-input" class="form-control" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="font-size: 0.85rem;">
-                    <div style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.3rem;">
-                        ※共有設定を「リンクを知っている全員が閲覧可能」に設定したスプレッドシートのURLを貼り付けてください。
+                <div class="input-group" style="background: rgba(0, 0, 0, 0.25); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary);">連携対象スプレッドシート（固定）</label>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                        <span style="font-size: 0.88rem; font-weight: 600; color: var(--accent);">Endfield 武器マスターデータ</span>
+                        <a href="https://docs.google.com/spreadsheets/d/1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo/edit?gid=332980878#gid=332980878" target="_blank" rel="noopener noreferrer" class="reset-btn" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(15, 157, 88, 0.15); border-color: rgba(15, 157, 88, 0.4); color: #57d28d; border-radius: 4px;">
+                            <span>🔗</span> ブラウザで開く
+                        </a>
                     </div>
                 </div>
 
@@ -373,13 +375,6 @@
                 </div>
 
                 <div id="gsheet-status-text" style="font-size: 0.85rem; min-height: 1.2rem; font-weight: 600; padding: 0.55rem; border-radius: 4px; display: none;"></div>
-
-                <div style="background: rgba(15, 157, 88, 0.08); padding: 0.85rem; border-radius: 6px; border: 1px solid rgba(15, 157, 88, 0.3); font-size: 0.8rem; line-height: 1.6;">
-                    <strong style="color: #57d28d; display: block; margin-bottom: 0.3rem;">💡 簡単セットアップガイド</strong>
-                    1. 現在のデータを <button type="button" id="gsheet-template-btn" style="background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 0.8rem; padding: 0;">テンプレートCSVとして保存</button> します。<br>
-                    2. Googleドライブにアップロードし「スプレッドシートとして開く」で直接編集を開始します。<br>
-                    3. スプレッドシートの「共有」設定で「リンクを知っている全員」にしてURLを上の枠に貼り付け、「今すぐ同期」を押してください！
-                </div>
             </div>
             <div class="modal-footer" style="padding: 1rem 1.25rem;">
                 <button id="close-gsheet-btn" class="reset-btn" style="flex: 1;">閉じる</button>
