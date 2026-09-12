@@ -1409,9 +1409,72 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeGsheetModalBtn) closeGsheetModalBtn.addEventListener('click', closeGsheet);
     if (closeGsheetBtn) closeGsheetBtn.addEventListener('click', closeGsheet);
 
+    function parseAreaDropCSVText(csvText) {
+        const rows = parseCSVText(csvText);
+        if (!rows || rows.length < 2) return new Map();
+
+        const headers = rows[0].map(h => h.trim().toLowerCase());
+        
+        let areaIdx = headers.findIndex(h => h.includes('エリア') || h.includes('area'));
+        let weaponIdx = headers.findIndex(h => h.includes('武器') || h.includes('weapon'));
+
+        if (areaIdx === -1 || weaponIdx === -1) {
+            if (headers.length >= 2) {
+                areaIdx = 0;
+                weaponIdx = 1;
+            } else {
+                return new Map();
+            }
+        }
+
+        const weaponToAreas = new Map();
+
+        const addMapping = (weaponName, areaName) => {
+            const w = weaponName.trim();
+            const a = areaName.trim();
+            if (!w || !a) return;
+            if (!weaponToAreas.has(w)) {
+                weaponToAreas.set(w, new Set());
+            }
+            weaponToAreas.get(w).add(a);
+        };
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+
+            const val1 = row[areaIdx] ? row[areaIdx].trim() : '';
+            const val2 = row[weaponIdx] ? row[weaponIdx].trim() : '';
+
+            if (!val1 && !val2) continue;
+
+            const items1 = val1.split(/[,;\n\r]/).map(s => s.trim()).filter(Boolean);
+            const items2 = val2.split(/[,;\n\r]/).map(s => s.trim()).filter(Boolean);
+
+            const isAreaFirst = areaIdx < weaponIdx || headers[areaIdx].includes('エリア');
+
+            if (isAreaFirst) {
+                items1.forEach(area => {
+                    items2.forEach(weapon => {
+                        addMapping(weapon, area);
+                    });
+                });
+            } else {
+                items1.forEach(weapon => {
+                    items2.forEach(area => {
+                        addMapping(weapon, area);
+                    });
+                });
+            }
+        }
+
+        return weaponToAreas;
+    }
+
     async function syncFromGoogleSheet(isManual = true) {
-        const rawUrl = FIXED_GSHEET_URL;
-        const csvUrl = convertGSheetUrlToCsvUrl(rawUrl);
+        const spreadsheetId = '1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo';
+        const weaponsGid = '332980878';
+        const masterCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${weaponsGid}`;
 
         // Save auto sync pref
         if (gsheetAutosyncCheck) {
@@ -1427,13 +1490,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
 
         try {
-            const res = await fetch(csvUrl, { cache: "no-store" });
-            if (!res.ok) {
-                throw new Error(`HTTP Error ${res.status}: データへのアクセスに失敗しました。`);
+            // 1. Fetch Weapon Master Sheet
+            const resMaster = await fetch(masterCsvUrl, { cache: "no-store" });
+            if (!resMaster.ok) {
+                throw new Error(`HTTP Error ${resMaster.status}: 武器マスターシートの取得に失敗しました。`);
             }
-            const csvText = await res.text();
-            const rows = parseCSVText(csvText);
-            const weapons = convertCsvRowsToWeapons(rows);
+            const csvMasterText = await resMaster.text();
+            const rowsMaster = parseCSVText(csvMasterText);
+            const weapons = convertCsvRowsToWeapons(rowsMaster);
+
+            // 2. Auto-detect & Fetch Area Drop Sheet (Tab 2) if present
+            try {
+                const editRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`, { cache: "no-store" });
+                if (editRes.ok) {
+                    const html = await editRes.text();
+                    const matches = [...html.matchAll(/"sheetId":(\d+)/g)];
+                    const allGids = [...new Set(matches.map(m => m[1]))];
+                    
+                    // Find a GID that is different from the weapons master GID
+                    const areaGid = allGids.find(g => g !== weaponsGid);
+
+                    if (areaGid) {
+                        const areaCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${areaGid}`;
+                        const resArea = await fetch(areaCsvUrl, { cache: "no-store" });
+                        if (resArea.ok) {
+                            const areaCsvText = await resArea.text();
+                            const weaponToAreasMap = parseAreaDropCSVText(areaCsvText);
+
+                            if (weaponToAreasMap.size > 0) {
+                                // Overwrite/Merge areas from Area Drop Sheet into weapons
+                                weapons.forEach(w => {
+                                    if (weaponToAreasMap.has(w.weapon_name)) {
+                                        w.areas = Array.from(weaponToAreasMap.get(w.weapon_name));
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (areaErr) {
+                console.warn("Area mapping sheet sync skipped or failed (using master sheet areas):", areaErr);
+            }
 
             localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(weapons));
 
