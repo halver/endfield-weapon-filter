@@ -1543,6 +1543,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.onUpdateError = function(errMsg) {
+        if (updateStatusText) {
+            updateStatusText.style.color = '#ff6b6b';
+            updateStatusText.textContent = `❌ ダウンロードエラー: ${errMsg}`;
+        }
+        if (updateStartBtn) {
+            updateStartBtn.disabled = false;
+        }
+    };
+
     if (window.AndroidInterface) {
         if (checkUpdateBtn) {
             checkUpdateBtn.style.display = 'inline-flex';
