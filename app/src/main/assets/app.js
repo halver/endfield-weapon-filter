@@ -1570,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function checkAppUpdate(isManual) {
         if (!window.AndroidInterface) return;
 
-        const updateJsonUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json';
+        const updateJsonUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
 
         if (isManual) {
             updateStatusText.textContent = "アップデートを確認中...";
