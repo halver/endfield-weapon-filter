@@ -175,33 +175,41 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
 
         CoroutineScope(Dispatchers.IO).launch {
             android.util.Log.d("AndroidInterface", "Download thread started")
-            val success = downloadApk(apkUrl)
-            android.util.Log.d("AndroidInterface", "Download success: $success")
+            val (success, errorMsg) = downloadApk(apkUrl)
+            android.util.Log.d("AndroidInterface", "Download result: success=$success, error=$errorMsg")
             withContext(Dispatchers.Main) {
                 if (success) {
                     showToast("ダウンロード完了。インストールを開始します...")
                     triggerInstall()
                 } else {
-                    showToast("アップデートのダウンロードに失敗しました。")
+                    val msg = if (errorMsg.isNotBlank()) errorMsg else "ダウンロードに失敗しました。"
+                    showToast("エラー: $msg")
+                    val safeMsg = msg.replace("'", "\\'").replace("\n", " ")
+                    getWebView()?.evaluateJavascript(
+                        "if(window.onUpdateError) window.onUpdateError('$safeMsg');",
+                        null
+                    )
                 }
             }
         }
     }
 
-    private fun downloadApk(apkUrl: String): Boolean {
+    private fun downloadApk(apkUrl: String): Pair<Boolean, String> {
         android.util.Log.d("AndroidInterface", "downloadApk: $apkUrl")
         return try {
             val url = URL(apkUrl)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
+            connection.instanceFollowRedirects = true
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
-            android.util.Log.d("AndroidInterface", "Connecting...")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) Mobile")
             connection.connect()
 
-            android.util.Log.d("AndroidInterface", "Response code: ${connection.responseCode}")
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                return false
+            val responseCode = connection.responseCode
+            android.util.Log.d("AndroidInterface", "Response code: $responseCode")
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                return Pair(false, "HTTP $responseCode: ファイルが見つかりません (URLが404エラーまたはリポジトリが非公開)")
             }
 
             val fileLength = connection.contentLength
@@ -245,10 +253,10 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
                 }
             }
             android.util.Log.d("AndroidInterface", "Download finished successfully. File size: ${apkFile.length()} bytes")
-            true
+            Pair(true, "")
         } catch (e: Exception) {
             android.util.Log.e("AndroidInterface", "APK Download failed", e)
-            false
+            Pair(false, e.message ?: "通信エラーが発生しました")
         }
     }
 
