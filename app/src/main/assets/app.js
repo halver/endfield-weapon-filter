@@ -1383,21 +1383,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Google Sheets Modal & Sync Logic
+    const FIXED_GSHEET_URL = 'https://docs.google.com/spreadsheets/d/1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo/edit?gid=332980878#gid=332980878';
     const gsheetSyncBtn = document.getElementById('gsheet-sync-btn');
     const gsheetModal = document.getElementById('gsheet-modal');
     const closeGsheetModalBtn = document.getElementById('close-gsheet-modal');
     const closeGsheetBtn = document.getElementById('close-gsheet-btn');
-    const gsheetUrlInput = document.getElementById('gsheet-url-input');
     const gsheetAutosyncCheck = document.getElementById('gsheet-autosync-check');
     const gsheetSyncNowBtn = document.getElementById('gsheet-sync-now-btn');
-    const gsheetTemplateBtn = document.getElementById('gsheet-template-btn');
     const gsheetStatusText = document.getElementById('gsheet-status-text');
 
     // Load saved GS settings
-    const savedGSheetUrl = localStorage.getItem('ENDFIELD_GSHEET_URL') || '';
     const savedAutoSync = localStorage.getItem('ENDFIELD_GSHEET_AUTOSYNC') === 'true';
 
-    if (gsheetUrlInput) gsheetUrlInput.value = savedGSheetUrl;
     if (gsheetAutosyncCheck) gsheetAutosyncCheck.checked = savedAutoSync;
 
     if (gsheetSyncBtn && gsheetModal) {
@@ -1412,24 +1409,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeGsheetModalBtn) closeGsheetModalBtn.addEventListener('click', closeGsheet);
     if (closeGsheetBtn) closeGsheetBtn.addEventListener('click', closeGsheet);
 
-    if (gsheetTemplateBtn) {
-        gsheetTemplateBtn.addEventListener('click', () => {
-            const csvText = generateCSVData(sourceData);
-            downloadOrSaveFile('endfield_weapons_template.csv', csvText, 'text/csv');
-        });
-    }
-
     async function syncFromGoogleSheet(isManual = true) {
-        const rawUrl = gsheetUrlInput ? gsheetUrlInput.value.trim() : (localStorage.getItem('ENDFIELD_GSHEET_URL') || '');
-        if (!rawUrl) {
-            if (isManual) alert("GoogleスプレッドシートのURLを入力してください。");
-            return;
-        }
-
+        const rawUrl = FIXED_GSHEET_URL;
         const csvUrl = convertGSheetUrlToCsvUrl(rawUrl);
 
-        // Save URL and auto sync pref
-        localStorage.setItem('ENDFIELD_GSHEET_URL', rawUrl);
+        // Save auto sync pref
         if (gsheetAutosyncCheck) {
             localStorage.setItem('ENDFIELD_GSHEET_AUTOSYNC', gsheetAutosyncCheck.checked ? 'true' : 'false');
         }
@@ -1445,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(csvUrl, { cache: "no-store" });
             if (!res.ok) {
-                throw new Error(`HTTP Error ${res.status}: データへのアクセスに失敗しました。アクセス権限を確認してください。`);
+                throw new Error(`HTTP Error ${res.status}: データへのアクセスに失敗しました。`);
             }
             const csvText = await res.text();
             const rows = parseCSVText(csvText);
@@ -1482,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Auto sync on startup if enabled
-    if (savedAutoSync && savedGSheetUrl) {
+    if (savedAutoSync) {
         syncFromGoogleSheet(false);
     }
 
