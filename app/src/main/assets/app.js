@@ -1504,11 +1504,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 const editRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`, { cache: "no-store" });
                 if (editRes.ok) {
                     const html = await editRes.text();
-                    const matches = [...html.matchAll(/"sheetId":(\d+)/g)];
-                    const allGids = [...new Set(matches.map(m => m[1]))];
                     
-                    // Find a GID that is different from the weapons master GID
-                    const areaGid = allGids.find(g => g !== weaponsGid);
+                    let areaGid = null;
+                    
+                    // Match sheetId and tab name
+                    const nameMatches = [...html.matchAll(/"sheetId":(\d+)[^}]*?"name":"([^"]+)"/g)];
+                    if (nameMatches.length > 0) {
+                        nameMatches.forEach(m => {
+                            const gid = m[1];
+                            const name = m[2];
+                            if (name.includes('エリア') || name.includes('排出')) {
+                                areaGid = gid;
+                            }
+                        });
+                    }
+
+                    // Fallback to any 2nd tab GID if name match is not found
+                    if (!areaGid) {
+                        const matches = [...html.matchAll(/"sheetId":(\d+)/g)];
+                        const allGids = [...new Set(matches.map(m => m[1]))];
+                        areaGid = allGids.find(g => g !== weaponsGid);
+                    }
 
                     if (areaGid) {
                         const areaCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${areaGid}`;
