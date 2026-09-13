@@ -1409,66 +1409,113 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeGsheetModalBtn) closeGsheetModalBtn.addEventListener('click', closeGsheet);
     if (closeGsheetBtn) closeGsheetBtn.addEventListener('click', closeGsheet);
 
-    function parseAreaDropCSVText(csvText) {
+    function parseEffectTokens(str) {
+        if (!str) return [];
+        return str.split(/[;,；,、\n\r]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+    }
+
+    function parseAreaEffectsCSVText(csvText) {
         const rows = parseCSVText(csvText);
-        if (!rows || rows.length < 2) return new Map();
+        if (!rows || rows.length < 2) return [];
 
         const headers = rows[0].map(h => h.trim().toLowerCase());
         
         let areaIdx = headers.findIndex(h => h.includes('エリア') || h.includes('area'));
-        let weaponIdx = headers.findIndex(h => h.includes('武器') || h.includes('weapon'));
+        let baseIdx = headers.findIndex(h => h.includes('基礎') || h.includes('base'));
+        let extraIdx = headers.findIndex(h => h.includes('付加') || h.includes('extra'));
+        let skillIdx = headers.findIndex(h => h.includes('スキル') || h.includes('skill'));
 
-        if (areaIdx === -1 || weaponIdx === -1) {
-            if (headers.length >= 2) {
+        if (areaIdx === -1) {
+            if (headers.length >= 4) {
                 areaIdx = 0;
-                weaponIdx = 1;
+                baseIdx = 1;
+                extraIdx = 2;
+                skillIdx = 3;
+            } else if (headers.length >= 1) {
+                areaIdx = 0;
             } else {
-                return new Map();
+                return [];
             }
         }
 
-        const weaponToAreas = new Map();
-
-        const addMapping = (weaponName, areaName) => {
-            const w = weaponName.trim();
-            const a = areaName.trim();
-            if (!w || !a) return;
-            if (!weaponToAreas.has(w)) {
-                weaponToAreas.set(w, new Set());
-            }
-            weaponToAreas.get(w).add(a);
-        };
+        const areaMap = new Map();
 
         for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row || row.length === 0) continue;
 
-            const val1 = row[areaIdx] ? row[areaIdx].trim() : '';
-            const val2 = row[weaponIdx] ? row[weaponIdx].trim() : '';
+            const areaName = row[areaIdx] ? row[areaIdx].trim() : '';
+            if (!areaName) continue;
 
-            if (!val1 && !val2) continue;
-
-            const items1 = val1.split(/[,;\n\r]/).map(s => s.trim()).filter(Boolean);
-            const items2 = val2.split(/[,;\n\r]/).map(s => s.trim()).filter(Boolean);
-
-            const isAreaFirst = areaIdx < weaponIdx || headers[areaIdx].includes('エリア');
-
-            if (isAreaFirst) {
-                items1.forEach(area => {
-                    items2.forEach(weapon => {
-                        addMapping(weapon, area);
-                    });
+            if (!areaMap.has(areaName)) {
+                areaMap.set(areaName, {
+                    area: areaName,
+                    bases: new Set(),
+                    extras: new Set(),
+                    skills: new Set()
                 });
-            } else {
-                items1.forEach(weapon => {
-                    items2.forEach(area => {
-                        addMapping(weapon, area);
-                    });
-                });
+            }
+
+            const entry = areaMap.get(areaName);
+
+            if (baseIdx !== -1 && row[baseIdx]) {
+                parseEffectTokens(row[baseIdx]).forEach(t => entry.bases.add(t));
+            }
+            if (extraIdx !== -1 && row[extraIdx]) {
+                parseEffectTokens(row[extraIdx]).forEach(t => entry.extras.add(t));
+            }
+            if (skillIdx !== -1 && row[skillIdx]) {
+                parseEffectTokens(row[skillIdx]).forEach(t => entry.skills.add(t));
             }
         }
 
-        return weaponToAreas;
+        return Array.from(areaMap.values());
+    }
+
+    function matchWeaponAreasWithEffects(weapons, areaEffects) {
+        if (!areaEffects || areaEffects.length === 0) return;
+
+        weapons.forEach(w => {
+            const baseVal = w.base_effect ? w.base_effect.trim() : '';
+            const extraVal = w.extra_effect ? w.extra_effect.trim() : '';
+            const skillVal = w.skill_effect ? w.skill_effect.trim() : '';
+
+            if (!baseVal && !extraVal && !skillVal) return;
+
+            const exactMatchAreas = [];
+            const partialMatchAreas = [];
+
+            areaEffects.forEach(ae => {
+                const isBaseMatch = !baseVal || Array.from(ae.bases).some(b => b === baseVal || baseVal.includes(b) || b.includes(baseVal));
+                const isExtraMatch = !extraVal || Array.from(ae.extras).some(e => e === extraVal || extraVal.includes(e) || e.includes(extraVal));
+                const isSkillMatch = !skillVal || Array.from(ae.skills).some(s => s === skillVal || skillVal.includes(s) || s.includes(skillVal));
+
+                if (isBaseMatch && isExtraMatch && isSkillMatch) {
+                    exactMatchAreas.push(ae.area);
+                }
+
+                const hasAnyMatch = (baseVal && Array.from(ae.bases).some(b => b === baseVal || baseVal.includes(b) || b.includes(baseVal))) ||
+                                    (extraVal && Array.from(ae.extras).some(e => e === extraVal || extraVal.includes(e) || e.includes(extraVal))) ||
+                                    (skillVal && Array.from(ae.skills).some(s => s === skillVal || skillVal.includes(s) || s.includes(skillVal)));
+                if (hasAnyMatch) {
+                    partialMatchAreas.push(ae.area);
+                }
+            });
+
+            let resultAreas = [];
+            if (exactMatchAreas.length > 0) {
+                resultAreas = exactMatchAreas;
+            } else if (partialMatchAreas.length > 0) {
+                resultAreas = partialMatchAreas;
+            }
+
+            if (resultAreas.length > 0) {
+                const merged = new Set([...(w.areas || []), ...resultAreas]);
+                w.areas = Array.from(merged);
+            }
+        });
     }
 
     async function syncFromGoogleSheet(isManual = true) {
@@ -1513,7 +1560,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         nameMatches.forEach(m => {
                             const gid = m[1];
                             const name = m[2];
-                            if (name.includes('エリア') || name.includes('排出')) {
+                            if (gid !== weaponsGid && (name.includes('エリア') || name.includes('効果') || name.includes('排出'))) {
                                 areaGid = gid;
                             }
                         });
@@ -1531,21 +1578,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         const resArea = await fetch(areaCsvUrl, { cache: "no-store" });
                         if (resArea.ok) {
                             const areaCsvText = await resArea.text();
-                            const weaponToAreasMap = parseAreaDropCSVText(areaCsvText);
+                            const areaEffects = parseAreaEffectsCSVText(areaCsvText);
 
-                            if (weaponToAreasMap.size > 0) {
-                                // Overwrite/Merge areas from Area Drop Sheet into weapons
-                                weapons.forEach(w => {
-                                    if (weaponToAreasMap.has(w.weapon_name)) {
-                                        w.areas = Array.from(weaponToAreasMap.get(w.weapon_name));
-                                    }
-                                });
+                            if (areaEffects.length > 0) {
+                                matchWeaponAreasWithEffects(weapons, areaEffects);
                             }
                         }
                     }
                 }
             } catch (areaErr) {
-                console.warn("Area mapping sheet sync skipped or failed (using master sheet areas):", areaErr);
+                console.warn("Area effects sheet sync skipped or failed (using master sheet areas):", areaErr);
             }
 
             localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(weapons));
