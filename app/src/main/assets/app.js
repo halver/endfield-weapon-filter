@@ -698,8 +698,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const displayType = w.weapon_type === 'アーツユニット' ? 'アーツ' : (w.weapon_type || '-');
         
+        const areasHtml = (w.areas && w.areas.length > 0)
+            ? w.areas.map(a => `<span class="table-area-tag">${a}</span>`).join(' ')
+            : '<span style="font-size: 0.75rem; color: var(--text-muted);">-</span>';
+
         tr.innerHTML = `
-            <td><span class="table-w-name">${w.weapon_name}</span></td>
+            <td>
+                <div class="table-w-name" style="font-weight: 700;">${w.weapon_name}</div>
+                <div class="table-areas-list" style="margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 0.25rem;">${areasHtml}</div>
+            </td>
             <td><span class="type-badge">${displayType}</span></td>
             <td><span class="char-badge ${w.character !== '汎用' ? 'special' : ''}">${w.character}</span></td>
             <td style="text-align: right;">
