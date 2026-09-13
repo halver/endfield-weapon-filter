@@ -22,12 +22,15 @@
             </div>
             
             <!-- Navigation -->
-            <nav class="nav-tabs">
+            <nav class="nav-tabs" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                 <button class="tab-btn active" data-tab="synergy">
                     <span>📡</span> ターゲットサーチ
                 </button>
                 <button class="tab-btn" data-tab="db">
                     <span>📂</span> 武器データベース
+                </button>
+                <button id="header-check-update-btn" class="reset-btn" style="padding: 0.45rem 0.85rem; font-size: 0.82rem; background: rgba(242, 169, 0, 0.15); border-color: rgba(242, 169, 0, 0.4); color: var(--primary); display: none;">
+                    <span>✨</span> 更新確認
                 </button>
             </nav>
         </div>
