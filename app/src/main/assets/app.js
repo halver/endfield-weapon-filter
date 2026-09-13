@@ -1265,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function parseEffectTokens(str) {
         if (!str) return [];
-        return str.split(/[;,；,、\n\r]/)
+        return str.split(/[;,；,、\.\n\r]/)
             .map(s => s.trim())
             .filter(s => s.length > 0);
     }
@@ -1390,6 +1390,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
 
+        // Remember existing weapon areas so they are never lost if matching yields no changes
+        const existingAreaMap = new Map();
+        try {
+            const currentData = JSON.parse(localStorage.getItem('ENDFIELD_WEAPONS_CUSTOM') || '[]');
+            currentData.forEach(w => {
+                if (w.name && w.areas && w.areas.length > 0) {
+                    existingAreaMap.set(w.name, w.areas);
+                }
+            });
+        } catch (e) {
+            console.warn("Could not parse existing weapon custom areas", e);
+        }
+
         try {
             // 1. Fetch Weapon Master Sheet
             const resMaster = await fetch(masterCsvUrl, { cache: "no-store" });
@@ -1400,48 +1413,52 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowsMaster = parseCSVText(csvMasterText);
             const weapons = convertCsvRowsToWeapons(rowsMaster);
 
-            // 2. Auto-detect & Fetch Area Drop Sheet (Tab 2) if present
+            // Pre-populate with existing areas as baseline
+            weapons.forEach(w => {
+                if (existingAreaMap.has(w.name)) {
+                    w.areas = existingAreaMap.get(w.name);
+                }
+            });
+
+            // 2. Fetch Area Drop / Effect Sheet (Tab 2)
+            // GID candidates: Tab 2 GID '142181474' and auto-discovered GIDs via htmlview
+            const candidateGids = new Set(['142181474']);
+
             try {
-                const editRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`, { cache: "no-store" });
-                if (editRes.ok) {
-                    const html = await editRes.text();
-                    
-                    let areaGid = null;
-                    
-                    // Match sheetId and tab name
-                    const nameMatches = [...html.matchAll(/"sheetId":(\d+)[^}]*?"name":"([^"]+)"/g)];
-                    if (nameMatches.length > 0) {
-                        nameMatches.forEach(m => {
-                            const gid = m[1];
-                            const name = m[2];
-                            if (gid !== weaponsGid && (name.includes('エリア') || name.includes('効果') || name.includes('排出'))) {
-                                areaGid = gid;
-                            }
-                        });
-                    }
+                const htmlViewRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/htmlview`, { cache: "no-store" });
+                if (htmlViewRes.ok) {
+                    const html = await htmlViewRes.text();
+                    const matches = [...html.matchAll(/gid=([0-9]+)/g)];
+                    matches.forEach(m => {
+                        if (m[1] !== weaponsGid) candidateGids.add(m[1]);
+                    });
+                }
+            } catch (htmlErr) {
+                console.warn("Could not fetch htmlview for auto GID detection, using fallback candidates", htmlErr);
+            }
 
-                    // Fallback to any 2nd tab GID if name match is not found
-                    if (!areaGid) {
-                        const matches = [...html.matchAll(/"sheetId":(\d+)/g)];
-                        const allGids = [...new Set(matches.map(m => m[1]))];
-                        areaGid = allGids.find(g => g !== weaponsGid);
-                    }
+            let areaEffectsLoaded = false;
+            for (const gid of candidateGids) {
+                try {
+                    const areaCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}&_t=${Date.now()}`;
+                    const resArea = await fetch(areaCsvUrl, { cache: "no-store" });
+                    if (resArea.ok) {
+                        const areaCsvText = await resArea.text();
+                        const areaEffects = parseAreaEffectsCSVText(areaCsvText);
 
-                    if (areaGid) {
-                        const areaCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${areaGid}`;
-                        const resArea = await fetch(areaCsvUrl, { cache: "no-store" });
-                        if (resArea.ok) {
-                            const areaCsvText = await resArea.text();
-                            const areaEffects = parseAreaEffectsCSVText(areaCsvText);
-
-                            if (areaEffects.length > 0) {
-                                matchWeaponAreasWithEffects(weapons, areaEffects);
-                            }
+                        if (areaEffects.length > 0) {
+                            matchWeaponAreasWithEffects(weapons, areaEffects);
+                            areaEffectsLoaded = true;
+                            break;
                         }
                     }
+                } catch (gidErr) {
+                    console.warn(`Attempt to fetch area sheet with GID ${gid} failed:`, gidErr);
                 }
-            } catch (areaErr) {
-                console.warn("Area effects sheet sync skipped or failed (using master sheet areas):", areaErr);
+            }
+
+            if (!areaEffectsLoaded) {
+                console.warn("Area effects sheet could not be loaded; preserved existing weapon areas.");
             }
 
             localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(weapons));
