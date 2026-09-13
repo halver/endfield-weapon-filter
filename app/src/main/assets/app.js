@@ -1565,25 +1565,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const headerCheckUpdateBtn = document.getElementById('header-check-update-btn');
 
-    if (window.AndroidInterface) {
-        [checkUpdateBtn, headerCheckUpdateBtn].forEach(btn => {
-            if (btn) {
-                btn.style.display = 'inline-flex';
-                btn.addEventListener('click', () => {
-                    checkAppUpdate(true);
-                });
-            }
-        });
-        
-        // Automatically check on startup (quietly) after 2 seconds
-        setTimeout(() => {
-            checkAppUpdate(false);
-        }, 2000);
-    }
+    [checkUpdateBtn, headerCheckUpdateBtn].forEach(btn => {
+        if (btn) {
+            btn.style.display = 'inline-flex';
+            btn.addEventListener('click', () => {
+                checkAppUpdate(true);
+            });
+        }
+    });
+    
+    // Automatically check on startup (quietly) after 2 seconds
+    setTimeout(() => {
+        checkAppUpdate(false);
+    }, 2000);
 
     function checkAppUpdate(isManual) {
-        if (!window.AndroidInterface) return;
-
         const primaryUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json?t=' + Date.now();
         const fallbackUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
 
@@ -1607,12 +1603,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         fetchUpdateData()
             .then(data => {
-                const currentCode = parseInt(window.AndroidInterface.getVersionCode(), 10) || 0;
+                const currentCode = (window.AndroidInterface && window.AndroidInterface.getVersionCode) 
+                    ? (parseInt(window.AndroidInterface.getVersionCode(), 10) || 0) 
+                    : 5;
+                const currentVersionName = (window.AndroidInterface && window.AndroidInterface.getVersionName) 
+                    ? window.AndroidInterface.getVersionName() 
+                    : "1.0.5";
+
                 const latestCode = parseInt(data.latest_version_code, 10) || 0;
                 const isNewer = latestCode > currentCode;
 
                 if (isNewer || isManual) {
-                    currentVersionText.textContent = window.AndroidInterface.getVersionName() + ` (Code: ${currentCode})`;
+                    currentVersionText.textContent = currentVersionName + ` (Code: ${currentCode})`;
                     latestVersionText.textContent = data.latest_version_name + ` (Code: ${latestCode})`;
                     
                     const modalTitle = updateModal ? updateModal.querySelector('.modal-header h2') : null;
@@ -1625,34 +1627,40 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateStartBtn.textContent = "アップデート実行";
                         updateStartBtn.style.display = 'inline-block';
                     } else {
-                        updateStatusText.textContent = `お使いのアプリは最新です (${window.AndroidInterface.getVersionName()})。新バージョンが配信された際にここからアップデートできます。`;
+                        updateStatusText.textContent = `お使いのアプリは最新です (${currentVersionName})。新バージョンが配信された際にここからアップデートできます。`;
                         updateStartBtn.style.display = 'none';
                     }
 
                     updateStartBtn.disabled = false;
                     resetUpdateProgress();
-                    updateModal.classList.add('active');
+                    if (updateModal) updateModal.classList.add('active');
 
                     // Bind update start button action
                     updateStartBtn.onclick = () => {
                         try {
-                            const hasPermission = window.AndroidInterface.checkInstallPermission();
-                            if (!hasPermission) {
-                                window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
-                                window.AndroidInterface.requestInstallPermission();
-                                return;
+                            if (window.AndroidInterface) {
+                                const hasPermission = window.AndroidInterface.checkInstallPermission();
+                                if (!hasPermission) {
+                                    window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
+                                    window.AndroidInterface.requestInstallPermission();
+                                    return;
+                                }
+                                
+                                updateStatusText.textContent = "ダウンロード中...";
+                                updateStartBtn.disabled = true;
+                                resetUpdateProgress();
+                                if (updateProgressContainer) updateProgressContainer.style.display = 'flex';
+                                
+                                if (!data || !data.apk_url) {
+                                    throw new Error("APK URL is missing in update data");
+                                }
+                                
+                                window.AndroidInterface.startUpdate(data.apk_url);
+                            } else {
+                                if (data && data.apk_url) {
+                                    window.open(data.apk_url, '_blank');
+                                }
                             }
-                            
-                            updateStatusText.textContent = "ダウンロード中...";
-                            updateStartBtn.disabled = true;
-                            resetUpdateProgress();
-                            if (updateProgressContainer) updateProgressContainer.style.display = 'flex';
-                            
-                            if (!data || !data.apk_url) {
-                                throw new Error("APK URL is missing in update data");
-                            }
-                            
-                            window.AndroidInterface.startUpdate(data.apk_url);
                         } catch (err) {
                             console.error("Update click failed", err);
                             if (window.AndroidInterface && window.AndroidInterface.showToast) {
@@ -1669,7 +1677,11 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(error => {
                 console.error("Update check failed", error);
                 if (isManual) {
-                    window.AndroidInterface.showToast("アップデートの確認に失敗しました。");
+                    if (window.AndroidInterface && window.AndroidInterface.showToast) {
+                        window.AndroidInterface.showToast("アップデートの確認に失敗しました。");
+                    } else {
+                        alert("アップデートの確認に失敗しました。");
+                    }
                 }
             });
     }
