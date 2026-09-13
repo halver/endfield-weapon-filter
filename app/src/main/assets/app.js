@@ -822,65 +822,10 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilters();
 
     // ==========================================
-    // SECTION C: Weapon Database Editor Logic
+    // SECTION C: Weapon Detail Modal Logic
     // ==========================================
-    const editorTableBody = document.querySelector('#editor-table tbody');
-    const weaponForm = document.getElementById('weapon-form');
-    const editWeaponIdInput = document.getElementById('edit-weapon-id');
-    const editNameInput = document.getElementById('edit-name');
-    const editTypeInput = document.getElementById('edit-type');
-    const editRarityInput = document.getElementById('edit-rarity');
-    const editCharInput = document.getElementById('edit-char');
-    const editBaseInput = document.getElementById('edit-base');
-    const editExtraInput = document.getElementById('edit-extra');
-    const editSkillInput = document.getElementById('edit-skill');
-    const formActionTitle = document.getElementById('form-action-title');
-    const cancelBtn = document.getElementById('cancel-btn');
-    const resetDbBtn = document.getElementById('reset-db-btn');
-
-    // List of active areas that we can check/uncheck
-    let activeAreasList = [...areaOrder];
-    sortedAreas.forEach(a => {
-        if (!activeAreasList.includes(a)) {
-            activeAreasList.push(a);
-        }
-    });
-
-    // Populate Datalists for suggestions
-    function populateSuggestions() {
-        const baseDl = document.getElementById('base-suggestions');
-        const extraDl = document.getElementById('extra-suggestions');
-        const skillDl = document.getElementById('skill-suggestions');
-
-        if (baseDl) baseDl.innerHTML = '';
-        if (extraDl) extraDl.innerHTML = '';
-        if (skillDl) skillDl.innerHTML = '';
-
-        sortedBases.forEach(b => {
-            const opt = document.createElement('option');
-            opt.value = b;
-            if (baseDl) baseDl.appendChild(opt);
-        });
-        sortedExtras.forEach(e => {
-            const opt = document.createElement('option');
-            opt.value = e;
-            if (extraDl) extraDl.appendChild(opt);
-        });
-        sortedSkills.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            if (skillDl) skillDl.appendChild(opt);
-        });
-    }
-
-
-
-    // Modal controls
     const detailModal = document.getElementById('detail-modal');
-    const editModal = document.getElementById('edit-modal');
     const closeDetailModalBtn = document.getElementById('close-detail-modal');
-    const closeEditModalBtn = document.getElementById('close-edit-modal');
-    const addWeaponBtn = document.getElementById('add-weapon-btn');
 
     function openDetailModal(w) {
         const detailBody = document.getElementById('detail-modal-body');
@@ -930,71 +875,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        detailModal.classList.add('active');
+        if (detailModal) detailModal.classList.add('active');
 
-        // Bind button actions for this weapon
-        const deleteBtn = document.getElementById('detail-delete-btn');
-        const editBtn = document.getElementById('detail-edit-btn');
         const synergyBtn = document.getElementById('detail-synergy-btn');
-
-        deleteBtn.onclick = () => {
-            if (confirm(`本当に「${w.weapon_name}」をデータベースから削除しますか？`)) {
-                const updatedList = sourceData.filter(item => item.id !== w.id);
-                localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(updatedList));
-                alert("削除しました。");
-                detailModal.classList.remove('active');
-                window.location.reload();
-            }
-        };
-
-        editBtn.onclick = () => {
-            detailModal.classList.remove('active');
-            openEditModal(w);
-        };
-
-        synergyBtn.onclick = () => {
-            detailModal.classList.remove('active');
-            const synergyTabBtn = document.querySelector('.tab-btn[data-tab="synergy"]');
-            if (synergyTabBtn) synergyTabBtn.click();
-            weaponSelect.value = w.id;
-            handleWeaponChange(w.id);
-        };
-    }
-
-    function openEditModal(w = null) {
-        if (w) {
-            // Edit mode
-            if (formActionTitle) formActionTitle.textContent = '📝 武器データの編集';
-            editWeaponIdInput.value = w.id;
-            editNameInput.value = w.weapon_name;
-            editTypeInput.value = w.weapon_type || '片手剣';
-            editRarityInput.value = w.rarity;
-            editCharInput.value = w.character;
-            editBaseInput.value = w.base_effect || '';
-            editExtraInput.value = w.extra_effect || '';
-            editSkillInput.value = w.skill_effect || '';
-        } else {
-            // Add mode
-            if (formActionTitle) formActionTitle.textContent = '➕ 武器データの追加';
-            editWeaponIdInput.value = '';
-            weaponForm.reset();
+        if (synergyBtn) {
+            synergyBtn.onclick = () => {
+                if (detailModal) detailModal.classList.remove('active');
+                const synergyTabBtn = document.querySelector('.tab-btn[data-tab="synergy"]');
+                if (synergyTabBtn) synergyTabBtn.click();
+                weaponSelect.value = w.id;
+                handleWeaponChange(w.id);
+            };
         }
-        editModal.classList.add('active');
     }
 
     if (closeDetailModalBtn) {
         closeDetailModalBtn.addEventListener('click', () => {
-            detailModal.classList.remove('active');
-        });
-    }
-    if (closeEditModalBtn) {
-        closeEditModalBtn.addEventListener('click', () => {
-            editModal.classList.remove('active');
-        });
-    }
-    if (addWeaponBtn) {
-        addWeaponBtn.addEventListener('click', () => {
-            openEditModal(null);
+            if (detailModal) detailModal.classList.remove('active');
         });
     }
 
@@ -1003,83 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === detailModal) {
             detailModal.classList.remove('active');
         }
-        if (e.target === editModal) {
-            editModal.classList.remove('active');
-        }
     });
-
-    // Handle Form Submit (Add/Edit save)
-    if (weaponForm) {
-        weaponForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-
-            const id = editWeaponIdInput.value.trim();
-            const name = editNameInput.value.trim();
-            const type = editTypeInput.value;
-            const rarity = parseInt(editRarityInput.value, 10);
-            const char = editCharInput.value.trim();
-            const base = editBaseInput.value.trim();
-            const extra = editExtraInput.value.trim();
-            const skill = editSkillInput.value.trim();
-
-            if (!name || !char) {
-                alert("必須フィールドを入力してください。");
-                return;
-            }
-
-            const existingWeapon = id ? sourceData.find(item => item.id === id) : null;
-            const existingAreas = existingWeapon && existingWeapon.areas ? existingWeapon.areas : [];
-
-            const newWeapon = {
-                id: id || `custom-${Date.now()}`,
-                weapon_name: name,
-                weapon_type: type,
-                variant_type: char === '汎用' ? 'generic' : 'character_specific',
-                rarity: rarity,
-                character: char,
-                areas: existingAreas,
-                base_effect: base || null,
-                extra_effect: extra || null,
-                skill_effect: skill || null,
-                side: "left"
-            };
-
-            let updatedList = [];
-            if (id) {
-                // Edit mode
-                updatedList = sourceData.map(item => item.id === id ? newWeapon : item);
-                alert("武器データを更新しました。");
-            } else {
-                // Add mode
-                updatedList = [...sourceData, newWeapon];
-                alert("武器データを追加しました。");
-            }
-
-            localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(updatedList));
-            window.location.reload();
-        });
-    }
-
-    // Handle Cancel Click
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
-            weaponForm.reset();
-            editWeaponIdInput.value = '';
-            if (formActionTitle) formActionTitle.textContent = '➕ 武器データの追加';
-            editModal.classList.remove('active');
-        });
-    }
-
-    // Reset Database to data.js Defaults
-    if (resetDbBtn) {
-        resetDbBtn.addEventListener('click', () => {
-            if (confirm("すべての編集内容（カスタム追加・編集データ）を削除し、元の data.js の初期状態に戻しますか？")) {
-                localStorage.removeItem('ENDFIELD_WEAPONS_CUSTOM');
-                alert("初期状態にリセットしました。");
-                window.location.reload();
-            }
-        });
-    }
 
 
 
@@ -1484,7 +1305,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log("Startup sync: New data detected from Google Sheets, updating UI...");
                     sourceData = weapons;
                     applyFilters();
-                    populateSuggestions();
                 }
             }
 
@@ -1510,13 +1330,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Always check for spreadsheet updates quietly on startup
     syncFromGoogleSheet(false);
-
-    // Initialize Editor tab displays
-    populateSuggestions();
-    populateAreasChecklist();
-
-    // Initial render of database explorer
-    applyFilters();
 
     // ==========================================
     // SECTION D: App Self-Update Logic (Android Only)

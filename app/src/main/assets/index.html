@@ -233,84 +233,10 @@
                 <!-- Dynamically populated in app.js -->
             </div>
             <div class="modal-footer">
-                <button id="detail-delete-btn" class="reset-btn" style="background: rgba(255, 71, 0, 0.1); border-color: rgba(255, 71, 0, 0.3); color: var(--rarity-6); font-weight: 700;">
-                    <span>🗑️</span> 削除する
-                </button>
-                <button id="detail-edit-btn" class="reset-btn" style="background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent); font-weight: 700;">
-                    <span>📝</span> 編集する
-                </button>
-                <button id="detail-synergy-btn" class="reset-btn" style="background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">
-                    <span>📡</span> ターゲットサーチ
+                <button id="detail-synergy-btn" class="reset-btn" style="width: 100%; background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">
+                    <span>📡</span> ターゲットサーチで組み合わせを確認
                 </button>
             </div>
-        </div>
-    </div>
-
-    <!-- Edit/Add Weapon Popup Modal -->
-    <div id="edit-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2 id="form-action-title">➕ 武器データの追加</h2>
-                <button class="close-modal-btn" id="close-edit-modal">&times;</button>
-            </div>
-            <form id="weapon-form" class="editor-form" style="margin: 0; display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                <div class="modal-body">
-                    <input type="hidden" id="edit-weapon-id">
-                    
-                    <div class="input-group">
-                        <label for="edit-name">武器名 <span style="color: var(--rarity-6)">*</span></label>
-                        <input type="text" id="edit-name" class="form-control" required placeholder="例：鋼鉄余音">
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-type">武器種 <span style="color: var(--rarity-6)">*</span></label>
-                        <select id="edit-type" class="form-control" required>
-                            <option value="片手剣">片手剣</option>
-                            <option value="大剣">大剣</option>
-                            <option value="長柄武器">長柄武器</option>
-                            <option value="拳銃">拳銃</option>
-                            <option value="アーツユニット">アーツユニット</option>
-                        </select>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-rarity">レアリティ <span style="color: var(--rarity-6)">*</span></label>
-                        <select id="edit-rarity" class="form-control" required>
-                            <option value="6">★6</option>
-                            <option value="5">★5</option>
-                        </select>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-char">モチーフキャラ <span style="color: var(--rarity-6)">*</span></label>
-                        <input type="text" id="edit-char" class="form-control" required placeholder="例：汎用 または アレッシュ">
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-base">基礎効果</label>
-                        <input type="text" id="edit-base" class="form-control" placeholder="例：敏捷UP" list="base-suggestions">
-                        <datalist id="base-suggestions"></datalist>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-extra">付加効果</label>
-                        <input type="text" id="edit-extra" class="form-control" placeholder="例：物理ダメージUP" list="extra-suggestions">
-                        <datalist id="extra-suggestions"></datalist>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="edit-skill">スキル効果</label>
-                        <input type="text" id="edit-skill" class="form-control" placeholder="例：巧技" list="skill-suggestions">
-                        <datalist id="skill-suggestions"></datalist>
-                    </div>
-
-                </div>
-
-                <div class="modal-footer" style="padding: 1rem 1.5rem;">
-                    <button type="button" id="cancel-btn" class="reset-btn" style="flex: 1;">キャンセル</button>
-                    <button type="submit" id="save-btn" class="reset-btn" style="flex: 1; background: var(--primary); color: #000; font-weight: 700; border-color: var(--primary);">保存</button>
-                </div>
-            </form>
         </div>
     </div>
 
