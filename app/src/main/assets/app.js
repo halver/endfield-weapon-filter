@@ -818,6 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters();
     });
 
+    // Initial render of DB Table Explorer on page load
+    applyFilters();
+
     // ==========================================
     // SECTION C: Weapon Database Editor Logic
     // ==========================================
