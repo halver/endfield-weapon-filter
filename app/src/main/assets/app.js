@@ -1563,7 +1563,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function checkAppUpdate(isManual) {
         if (!window.AndroidInterface) return;
 
-        const updateJsonUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
+        const primaryUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json?t=' + Date.now();
+        const fallbackUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
 
         if (isManual) {
             updateStatusText.textContent = "アップデートを確認中...";
@@ -1571,13 +1572,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resetUpdateProgress();
 
-        fetch(updateJsonUrl, { cache: "no-store" })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Network response was not ok");
-                }
-                return response.json();
-            })
+        const fetchUpdateData = async () => {
+            try {
+                const resPrimary = await fetch(primaryUrl, { cache: "no-store" });
+                if (resPrimary.ok) return await resPrimary.json();
+            } catch (e) {
+                console.warn("Primary update check failed, trying fallback Gist...", e);
+            }
+            const resFallback = await fetch(fallbackUrl, { cache: "no-store" });
+            if (!resFallback.ok) throw new Error("アップデート情報の取得に失敗しました。");
+            return await resFallback.json();
+        };
+
+        fetchUpdateData()
             .then(data => {
                 const currentCode = parseInt(window.AndroidInterface.getVersionCode(), 10) || 0;
                 const latestCode = parseInt(data.latest_version_code, 10) || 0;
