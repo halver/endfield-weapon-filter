@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (w.weapon_type) uniqueTypes.add(w.weapon_type);
     });
 
-    const areaOrder = ["中枢エリア", "原石研究パーク", "鉱山エリア", "エネルギー高地", "武陵城", "清波砦", "首礎", "実験区域", "蔵剣谷"];
+    const areaOrder = ["中枢エリア", "原石研究パーク", "鉱山エリア", "エネルギー高地", "武陵城", "清波砦", "首礎", "実験区域", "蔵剣谷", "応龍関", "北部封鎖区域"];
     const sortedAreas = Array.from(uniqueAreas).sort((a, b) => {
         const idxA = areaOrder.indexOf(a);
         const idxB = areaOrder.indexOf(b);
@@ -125,6 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Populate Quick Select List in Sidebar
     function renderQuickSelectList() {
+        const headerElem = document.getElementById('quick-select-header');
+        if (headerElem) {
+            headerElem.textContent = `クイック選択 (全${db.length}種)`;
+        }
         quickSelectList.innerHTML = '';
         db.forEach(w => {
             const btn = document.createElement('button');
@@ -1521,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function syncFromGoogleSheet(isManual = true) {
         const spreadsheetId = '1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo';
         const weaponsGid = '332980878';
-        const masterCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${weaponsGid}`;
+        const masterCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${weaponsGid}&_t=${Date.now()}`;
 
         // Save auto sync pref
         if (gsheetAutosyncCheck) {
