@@ -190,20 +190,6 @@
                     <button id="gsheet-sync-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(15, 157, 88, 0.15); border-color: #0f9d58; color: #57d28d; font-weight: 600;">
                         <span>🟩</span> スプレッドシート連携
                     </button>
-                    <button id="export-csv-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(0, 210, 255, 0.1); border-color: rgba(0, 210, 255, 0.3); color: var(--accent);">
-                        <span>📊</span> CSV出力
-                    </button>
-                    <label for="import-csv-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
-                        <span>📈</span> CSV取り込み
-                        <input type="file" id="import-csv-file" accept=".csv" style="display: none;">
-                    </label>
-                    <button id="export-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.2); color: var(--text-secondary);">
-                        <span>📥</span> JS出力
-                    </button>
-                    <label for="import-file" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.2); color: var(--text-secondary);">
-                        <span>📤</span> JSON取込
-                        <input type="file" id="import-file" accept=".json,.js" style="display: none;">
-                    </label>
                     <button id="reset-db-btn" class="reset-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 71, 0, 0.1); border-color: rgba(255, 71, 0, 0.3); color: var(--rarity-6);">
                         <span>🔄</span> リセット
                     </button>
@@ -321,20 +307,6 @@
                         <datalist id="skill-suggestions"></datalist>
                     </div>
 
-                    <div class="input-group">
-                        <label>ドロップエリア (複数選択可)</label>
-                        <div id="edit-areas-container" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border);">
-                            <!-- Checkboxes populated dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="new-area-name">新規エリアの追加</label>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="new-area-name" class="form-control" placeholder="例：原石研究パーク">
-                            <button type="button" id="add-new-area-btn" class="reset-btn" style="padding: 0.5rem 1rem;">追加</button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="modal-footer" style="padding: 1rem 1.5rem;">

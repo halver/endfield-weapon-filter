@@ -831,14 +831,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const editBaseInput = document.getElementById('edit-base');
     const editExtraInput = document.getElementById('edit-extra');
     const editSkillInput = document.getElementById('edit-skill');
-    const editAreasContainer = document.getElementById('edit-areas-container');
-    const newAreaNameInput = document.getElementById('new-area-name');
-    const addNewAreaBtn = document.getElementById('add-new-area-btn');
     const formActionTitle = document.getElementById('form-action-title');
     const cancelBtn = document.getElementById('cancel-btn');
-    
-    const exportBtn = document.getElementById('export-btn');
-    const importFileInput = document.getElementById('import-file');
     const resetDbBtn = document.getElementById('reset-db-btn');
 
     // List of active areas that we can check/uncheck
@@ -876,55 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Populate drop areas checklist
-    function populateAreasChecklist(checkedAreas = []) {
-        if (!editAreasContainer) return;
-        editAreasContainer.innerHTML = '';
-        activeAreasList.forEach(area => {
-            const label = document.createElement('label');
-            label.style.display = 'flex';
-            label.style.alignItems = 'center';
-            label.style.gap = '0.5rem';
-            label.style.cursor = 'pointer';
-            label.style.fontSize = '0.85rem';
-            label.style.fontWeight = '500';
 
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = area;
-            checkbox.checked = checkedAreas.includes(area);
-            checkbox.className = 'area-checkbox';
-
-            label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(area));
-            editAreasContainer.appendChild(label);
-        });
-    }
-
-    // Add new custom area to checklist
-    if (addNewAreaBtn) {
-        addNewAreaBtn.addEventListener('click', () => {
-            const newArea = newAreaNameInput.value.trim();
-            if (!newArea) return;
-            if (!activeAreasList.includes(newArea)) {
-                activeAreasList.push(newArea);
-                activeAreasList.sort((a, b) => {
-                    const idxA = areaOrder.indexOf(a);
-                    const idxB = areaOrder.indexOf(b);
-                    return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-                });
-            }
-            
-            // Collect currently checked areas
-            const currentChecked = Array.from(document.querySelectorAll('.area-checkbox:checked')).map(cb => cb.value);
-            if (!currentChecked.includes(newArea)) {
-                currentChecked.push(newArea);
-            }
-
-            populateAreasChecklist(currentChecked);
-            newAreaNameInput.value = '';
-        });
-    }
 
     // Modal controls
     const detailModal = document.getElementById('detail-modal');
@@ -1024,13 +970,11 @@ document.addEventListener('DOMContentLoaded', () => {
             editBaseInput.value = w.base_effect || '';
             editExtraInput.value = w.extra_effect || '';
             editSkillInput.value = w.skill_effect || '';
-            populateAreasChecklist(w.areas || []);
         } else {
             // Add mode
             if (formActionTitle) formActionTitle.textContent = '➕ 武器データの追加';
             editWeaponIdInput.value = '';
             weaponForm.reset();
-            populateAreasChecklist([]);
         }
         editModal.classList.add('active');
     }
@@ -1075,13 +1019,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const extra = editExtraInput.value.trim();
             const skill = editSkillInput.value.trim();
 
-            // Get checked areas
-            const checkedAreas = Array.from(document.querySelectorAll('.area-checkbox:checked')).map(cb => cb.value);
-
             if (!name || !char) {
                 alert("必須フィールドを入力してください。");
                 return;
             }
+
+            const existingWeapon = id ? sourceData.find(item => item.id === id) : null;
+            const existingAreas = existingWeapon && existingWeapon.areas ? existingWeapon.areas : [];
 
             const newWeapon = {
                 id: id || `custom-${Date.now()}`,
@@ -1090,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 variant_type: char === '汎用' ? 'generic' : 'character_specific',
                 rarity: rarity,
                 character: char,
-                areas: checkedAreas,
+                areas: existingAreas,
                 base_effect: base || null,
                 extra_effect: extra || null,
                 skill_effect: skill || null,
@@ -1119,7 +1063,6 @@ document.addEventListener('DOMContentLoaded', () => {
             weaponForm.reset();
             editWeaponIdInput.value = '';
             if (formActionTitle) formActionTitle.textContent = '➕ 武器データの追加';
-            populateAreasChecklist();
             editModal.classList.remove('active');
         });
     }
@@ -1135,67 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function downloadOrSaveFile(fileName, content, mimeType = 'text/csv') {
-        if (window.AndroidInterface && window.AndroidInterface.saveFile) {
-            window.AndroidInterface.saveFile(fileName, content, mimeType);
-        } else {
-            const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", fileName);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    }
 
-    // Export data.js file
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            // Format the database array nicely
-            const prettyJson = JSON.stringify(sourceData, null, 4);
-            const fileContent = `const WEAPONS_DATA = ${prettyJson};`;
-            downloadOrSaveFile('data.js', fileContent, 'text/javascript');
-        });
-    }
-
-    // Import JSON/JS data file
-    if (importFileInput) {
-        importFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    let text = event.target.result.trim();
-                    // Strip Javascript assignment if present
-                    if (text.startsWith("const WEAPONS_DATA =")) {
-                        text = text.substring("const WEAPONS_DATA =".length).trim();
-                    }
-                    if (text.endsWith(";")) {
-                        text = text.substring(0, text.length - 1).trim();
-                    }
-
-                    const importedData = JSON.parse(text);
-                    if (Array.isArray(importedData)) {
-                        localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(importedData));
-                        alert("インポートが正常に完了しました！");
-                        window.location.reload();
-                    } else {
-                        alert("インポートされたデータが配列ではありません。正しいデータ形式を選択してください。");
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert("ファイルの解析に失敗しました。ファイルの内容が正しい形式（JSON または data.js）であることを確認してください。");
-                }
-            };
-            reader.readAsText(file);
-        });
-    }
 
     // ==========================================
     // SECTION E: CSV & Google Sheets Integration
@@ -1252,7 +1135,6 @@ document.addEventListener('DOMContentLoaded', () => {
             weapon_type: rawHeaders.findIndex(h => h.includes('武器種') || h.includes('weapontype') || h.includes('type')),
             rarity: rawHeaders.findIndex(h => h.includes('レアリティ') || h.includes('rarity') || h.includes('star')),
             character: rawHeaders.findIndex(h => h.includes('モチーフ') || h.includes('キャラ') || h.includes('character') || h.includes('owner')),
-            areas: rawHeaders.findIndex(h => h.includes('入手エリア') || h.includes('エリア') || h.includes('areas') || h.includes('area')),
             base_effect: rawHeaders.findIndex(h => h.includes('基礎効果') || h.includes('基礎') || h.includes('baseeffect') || h.includes('base')),
             extra_effect: rawHeaders.findIndex(h => h.includes('付加効果') || h.includes('付加') || h.includes('extraeffect') || h.includes('extra')),
             skill_effect: rawHeaders.findIndex(h => h.includes('スキル効果') || h.includes('スキル') || h.includes('skilleffect') || h.includes('skill'))
@@ -1273,12 +1155,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = (headerIndices.weapon_type !== -1 && row[headerIndices.weapon_type]) ? row[headerIndices.weapon_type] : '片手剣';
             const rarityVal = (headerIndices.rarity !== -1 && row[headerIndices.rarity]) ? parseInt(row[headerIndices.rarity], 10) : 5;
             const charVal = (headerIndices.character !== -1 && row[headerIndices.character]) ? row[headerIndices.character] : '汎用';
-            
-            let areasList = [];
-            if (headerIndices.areas !== -1 && row[headerIndices.areas]) {
-                const rawAreas = row[headerIndices.areas];
-                areasList = rawAreas.split(/[;,；,、\n]/).map(a => a.trim()).filter(a => a.length > 0);
-            }
 
             const baseVal = headerIndices.base_effect !== -1 ? (row[headerIndices.base_effect] || '') : '';
             const extraVal = headerIndices.extra_effect !== -1 ? (row[headerIndices.extra_effect] || '') : '';
@@ -1293,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 variant_type: variantType,
                 rarity: isNaN(rarityVal) ? 5 : rarityVal,
                 character: charVal,
-                areas: areasList,
+                areas: [],
                 base_effect: baseVal,
                 extra_effect: extraVal,
                 skill_effect: skillVal
@@ -1358,40 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return url;
     }
 
-    // CSV Export Button
-    const exportCsvBtn = document.getElementById('export-csv-btn');
-    if (exportCsvBtn) {
-        exportCsvBtn.addEventListener('click', () => {
-            const csvText = generateCSVData(sourceData);
-            downloadOrSaveFile('endfield_weapons.csv', csvText, 'text/csv');
-        });
-    }
 
-    // CSV Import Input
-    const importCsvFile = document.getElementById('import-csv-file');
-    if (importCsvFile) {
-        importCsvFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const text = event.target.result;
-                    const rows = parseCSVText(text);
-                    const parsedWeapons = convertCsvRowsToWeapons(rows);
-
-                    localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(parsedWeapons));
-                    alert(`CSVから${parsedWeapons.length}件の武器データをインポートしました！`);
-                    window.location.reload();
-                } catch (err) {
-                    console.error("CSV Parse Error:", err);
-                    alert("CSVのインポートに失敗しました: " + err.message);
-                }
-            };
-            reader.readAsText(file);
-        });
-    }
 
     // Google Sheets Modal & Sync Logic
     const FIXED_GSHEET_URL = 'https://docs.google.com/spreadsheets/d/1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo/edit?gid=332980878#gid=332980878';
