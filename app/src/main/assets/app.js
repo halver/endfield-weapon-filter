@@ -1411,6 +1411,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const primaryUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json?t=' + Date.now();
         const fallbackUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
 
+        const updateModalDesc = document.getElementById('update-modal-desc');
+
         const currentCode = (window.AndroidInterface && window.AndroidInterface.getVersionCode) 
             ? (parseInt(window.AndroidInterface.getVersionCode(), 10) || 0) 
             : 6;
@@ -1421,9 +1423,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isManual) {
             if (currentVersionText) currentVersionText.textContent = `${currentVersionName} (Code: ${currentCode})`;
             if (latestVersionText) latestVersionText.textContent = "確認中...";
+            if (updateModalDesc) updateModalDesc.textContent = "⏳ 最新バージョンの情報を確認中...";
             if (updateStatusText) {
                 updateStatusText.style.color = "var(--accent)";
-                updateStatusText.textContent = "⏳ 最新バージョンの情報を確認中...";
+                updateStatusText.textContent = "通信状態を確認しています...";
             }
             if (updateStartBtn) updateStartBtn.style.display = 'none';
             resetUpdateProgress();
@@ -1457,9 +1460,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (isNewer) {
+                        if (updateModalDesc) updateModalDesc.textContent = "🎉 新しいバージョンのアプリが利用可能です！";
                         if (updateStatusText) {
                             updateStatusText.style.color = "#57d28d";
-                            updateStatusText.textContent = "🎉 新しいバージョンが利用可能です！";
+                            updateStatusText.textContent = "最新バージョンにアップデートして新機能をご利用ください。";
                         }
                         if (updateStartBtn) {
                             updateStartBtn.textContent = "アップデート実行";
@@ -1467,9 +1471,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateStartBtn.disabled = false;
                         }
                     } else {
+                        if (updateModalDesc) updateModalDesc.textContent = "✅ お使いのアプリは最新バージョンです。";
                         if (updateStatusText) {
                             updateStatusText.style.color = "var(--accent)";
-                            updateStatusText.textContent = `✅ お使いのアプリは最新バージョンです (${currentVersionName})。`;
+                            updateStatusText.textContent = `現在バージョン ${currentVersionName} をご利用中です。更新の必要はありません。`;
                         }
                         if (updateStartBtn) updateStartBtn.style.display = 'none';
                     }
