@@ -1461,27 +1461,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("Area effects sheet could not be loaded; preserved existing weapon areas.");
             }
 
-            localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', JSON.stringify(weapons));
+            const newJson = JSON.stringify(weapons);
+            const currentJson = JSON.stringify(sourceData);
 
-            if (gsheetStatusText) {
-                gsheetStatusText.style.background = 'rgba(15, 157, 88, 0.2)';
-                gsheetStatusText.style.color = '#57d28d';
-                gsheetStatusText.textContent = `✅ 同期成功！ ${weapons.length} 件の武器データを更新しました。`;
+            localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', newJson);
+
+            if (isManual) {
+                if (gsheetStatusText) {
+                    gsheetStatusText.style.background = 'rgba(15, 157, 88, 0.2)';
+                    gsheetStatusText.style.color = '#57d28d';
+                    gsheetStatusText.textContent = `✅ 同期成功！ ${weapons.length} 件の武器データを更新しました。`;
+                }
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                // Background startup sync: if data updated, refresh UI dynamically
+                if (newJson !== currentJson) {
+                    console.log("Startup sync: New data detected from Google Sheets, updating UI...");
+                    sourceData = weapons;
+                    applyFilters();
+                    populateSuggestions();
+                }
             }
-
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
 
         } catch (err) {
             console.error("GSheet Sync Error:", err);
-            if (gsheetStatusText) {
-                gsheetStatusText.style.display = 'block';
-                gsheetStatusText.style.background = 'rgba(255, 71, 0, 0.2)';
-                gsheetStatusText.style.color = '#ff6b6b';
-                gsheetStatusText.textContent = `❌ 同期エラー: ${err.message}`;
+            if (isManual) {
+                if (gsheetStatusText) {
+                    gsheetStatusText.style.display = 'block';
+                    gsheetStatusText.style.background = 'rgba(255, 71, 0, 0.2)';
+                    gsheetStatusText.style.color = '#ff6b6b';
+                    gsheetStatusText.textContent = `❌ 同期エラー: ${err.message}`;
+                }
+                if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = false;
             }
-            if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = false;
         }
     }
 
@@ -1491,10 +1505,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Auto sync on startup if enabled
-    if (savedAutoSync) {
-        syncFromGoogleSheet(false);
-    }
+    // Always check for spreadsheet updates quietly on startup
+    syncFromGoogleSheet(false);
 
     // Initialize Editor tab displays
     populateSuggestions();
