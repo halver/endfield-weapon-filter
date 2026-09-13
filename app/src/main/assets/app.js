@@ -1595,11 +1595,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const primaryUrl = 'https://raw.githubusercontent.com/halver/endfield-weapon-filter/main/update.json?t=' + Date.now();
         const fallbackUrl = 'https://gist.githubusercontent.com/halver/b65e2036929f618ca9799bfa7ec1d9c9/raw/update.json?t=' + Date.now();
 
-        if (isManual) {
-            updateStatusText.textContent = "アップデートを確認中...";
-        }
+        const currentCode = (window.AndroidInterface && window.AndroidInterface.getVersionCode) 
+            ? (parseInt(window.AndroidInterface.getVersionCode(), 10) || 0) 
+            : 6;
+        const currentVersionName = (window.AndroidInterface && window.AndroidInterface.getVersionName) 
+            ? window.AndroidInterface.getVersionName() 
+            : "1.0.6";
 
-        resetUpdateProgress();
+        if (isManual) {
+            if (currentVersionText) currentVersionText.textContent = `${currentVersionName} (Code: ${currentCode})`;
+            if (latestVersionText) latestVersionText.textContent = "確認中...";
+            if (updateStatusText) {
+                updateStatusText.style.color = "var(--accent)";
+                updateStatusText.textContent = "⏳ 最新バージョンの情報を確認中...";
+            }
+            if (updateStartBtn) updateStartBtn.style.display = 'none';
+            resetUpdateProgress();
+            if (updateModal) updateModal.classList.add('active');
+        }
 
         const fetchUpdateData = async () => {
             try {
@@ -1615,85 +1628,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
         fetchUpdateData()
             .then(data => {
-                const currentCode = (window.AndroidInterface && window.AndroidInterface.getVersionCode) 
-                    ? (parseInt(window.AndroidInterface.getVersionCode(), 10) || 0) 
-                    : 5;
-                const currentVersionName = (window.AndroidInterface && window.AndroidInterface.getVersionName) 
-                    ? window.AndroidInterface.getVersionName() 
-                    : "1.0.5";
-
                 const latestCode = parseInt(data.latest_version_code, 10) || 0;
                 const isNewer = latestCode > currentCode;
 
                 if (isNewer || isManual) {
-                    currentVersionText.textContent = currentVersionName + ` (Code: ${currentCode})`;
-                    latestVersionText.textContent = data.latest_version_name + ` (Code: ${latestCode})`;
+                    if (currentVersionText) currentVersionText.textContent = `${currentVersionName} (Code: ${currentCode})`;
+                    if (latestVersionText) latestVersionText.textContent = `${data.latest_version_name} (Code: ${latestCode})`;
                     
                     const modalTitle = updateModal ? updateModal.querySelector('.modal-header h2') : null;
                     if (modalTitle) {
-                        modalTitle.textContent = isNewer ? "✨ アプリのアップデート" : "⚡ アプリの再インストール (開発・テスト用)";
+                        modalTitle.textContent = isNewer ? "✨ アプリのアップデート" : "📱 アプリ情報";
                     }
 
                     if (isNewer) {
-                        updateStatusText.textContent = "新しいバージョンが利用可能です！";
-                        updateStartBtn.textContent = "アップデート実行";
-                        updateStartBtn.style.display = 'inline-block';
+                        if (updateStatusText) {
+                            updateStatusText.style.color = "#57d28d";
+                            updateStatusText.textContent = "🎉 新しいバージョンが利用可能です！";
+                        }
+                        if (updateStartBtn) {
+                            updateStartBtn.textContent = "アップデート実行";
+                            updateStartBtn.style.display = 'inline-block';
+                            updateStartBtn.disabled = false;
+                        }
                     } else {
-                        updateStatusText.textContent = `お使いのアプリは最新です (${currentVersionName})。新バージョンが配信された際にここからアップデートできます。`;
-                        updateStartBtn.style.display = 'none';
+                        if (updateStatusText) {
+                            updateStatusText.style.color = "var(--accent)";
+                            updateStatusText.textContent = `✅ お使いのアプリは最新バージョンです (${currentVersionName})。`;
+                        }
+                        if (updateStartBtn) updateStartBtn.style.display = 'none';
                     }
 
-                    updateStartBtn.disabled = false;
                     resetUpdateProgress();
                     if (updateModal) updateModal.classList.add('active');
 
                     // Bind update start button action
-                    updateStartBtn.onclick = () => {
-                        try {
-                            if (window.AndroidInterface) {
-                                const hasPermission = window.AndroidInterface.checkInstallPermission();
-                                if (!hasPermission) {
-                                    window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
-                                    window.AndroidInterface.requestInstallPermission();
-                                    return;
+                    if (updateStartBtn) {
+                        updateStartBtn.onclick = () => {
+                            try {
+                                if (window.AndroidInterface) {
+                                    const hasPermission = window.AndroidInterface.checkInstallPermission();
+                                    if (!hasPermission) {
+                                        window.AndroidInterface.showToast("インストールの許可が必要です。設定画面を開きます。");
+                                        window.AndroidInterface.requestInstallPermission();
+                                        return;
+                                    }
+                                    
+                                    if (updateStatusText) updateStatusText.textContent = "ダウンロード中...";
+                                    updateStartBtn.disabled = true;
+                                    resetUpdateProgress();
+                                    if (updateProgressContainer) updateProgressContainer.style.display = 'flex';
+                                    
+                                    if (!data || !data.apk_url) {
+                                        throw new Error("APK URL is missing in update data");
+                                    }
+                                    
+                                    window.AndroidInterface.startUpdate(data.apk_url);
+                                } else {
+                                    if (data && data.apk_url) {
+                                        window.open(data.apk_url, '_blank');
+                                    }
                                 }
-                                
-                                updateStatusText.textContent = "ダウンロード中...";
-                                updateStartBtn.disabled = true;
-                                resetUpdateProgress();
-                                if (updateProgressContainer) updateProgressContainer.style.display = 'flex';
-                                
-                                if (!data || !data.apk_url) {
-                                    throw new Error("APK URL is missing in update data");
+                            } catch (err) {
+                                console.error("Update click failed", err);
+                                if (window.AndroidInterface && window.AndroidInterface.showToast) {
+                                    window.AndroidInterface.showToast("JS Error: " + err.message);
+                                } else {
+                                    alert("JS Error: " + err.message);
                                 }
-                                
-                                window.AndroidInterface.startUpdate(data.apk_url);
-                            } else {
-                                if (data && data.apk_url) {
-                                    window.open(data.apk_url, '_blank');
-                                }
+                                if (updateStatusText) updateStatusText.textContent = "エラーが発生しました";
+                                updateStartBtn.disabled = false;
                             }
-                        } catch (err) {
-                            console.error("Update click failed", err);
-                            if (window.AndroidInterface && window.AndroidInterface.showToast) {
-                                window.AndroidInterface.showToast("JS Error: " + err.message);
-                            } else {
-                                alert("JS Error: " + err.message);
-                            }
-                            updateStatusText.textContent = "エラーが発生しました";
-                            updateStartBtn.disabled = false;
-                        }
-                    };
+                        };
+                    }
                 }
             })
             .catch(error => {
                 console.error("Update check failed", error);
                 if (isManual) {
-                    if (window.AndroidInterface && window.AndroidInterface.showToast) {
-                        window.AndroidInterface.showToast("アップデートの確認に失敗しました。");
-                    } else {
-                        alert("アップデートの確認に失敗しました。");
+                    if (latestVersionText) latestVersionText.textContent = "取得失敗";
+                    if (updateStatusText) {
+                        updateStatusText.style.color = "#ff6b6b";
+                        updateStatusText.textContent = `❌ アプリ更新情報の取得に失敗しました。通信環境をご確認ください。`;
                     }
+                    if (updateModal) updateModal.classList.add('active');
                 }
             });
     }
