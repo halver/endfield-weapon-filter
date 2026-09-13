@@ -1563,13 +1563,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const headerCheckUpdateBtn = document.getElementById('header-check-update-btn');
+
     if (window.AndroidInterface) {
-        if (checkUpdateBtn) {
-            checkUpdateBtn.style.display = 'inline-flex';
-            checkUpdateBtn.addEventListener('click', () => {
-                checkAppUpdate(true);
-            });
-        }
+        [checkUpdateBtn, headerCheckUpdateBtn].forEach(btn => {
+            if (btn) {
+                btn.style.display = 'inline-flex';
+                btn.addEventListener('click', () => {
+                    checkAppUpdate(true);
+                });
+            }
+        });
         
         // Automatically check on startup (quietly) after 2 seconds
         setTimeout(() => {
