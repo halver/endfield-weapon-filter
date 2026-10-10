@@ -16,11 +16,25 @@ android {
     }
 
     signingConfigs {
+        // Signing credentials come from environment variables (CI secrets) or
+        // ~/.gradle/gradle.properties. They must never be committed to the repository.
         create("config") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            fun secret(name: String): String? =
+                System.getenv(name) ?: providers.gradleProperty(name).orNull
+            val storePath = secret("SIGNING_STORE_FILE")
+            if (storePath != null) {
+                storeFile = file(storePath)
+                storePassword = secret("SIGNING_STORE_PASSWORD")
+                keyAlias = secret("SIGNING_KEY_ALIAS")
+                keyPassword = secret("SIGNING_KEY_PASSWORD")
+            } else {
+                // Local development fallback: the standard per-machine debug key
+                val debugStore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storeFile = debugStore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
