@@ -50,10 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // rarity is used in class names and Array() lengths, so force it to a sane integer
-    sourceData.forEach(w => {
-        const r = parseInt(w.rarity, 10);
-        w.rarity = (r >= 1 && r <= 6) ? r : 5;
-    });
+    const normalizeRarity = (weapons) => {
+        weapons.forEach(w => {
+            const r = parseInt(w.rarity, 10);
+            w.rarity = (r >= 1 && r <= 6) ? r : 5;
+        });
+    };
+    normalizeRarity(sourceData);
 
     const db = [...sourceData].sort((a, b) => {
         // 1. Weapon Type Order
@@ -1047,32 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return '\uFEFF' + csvContent;
     }
 
-    function convertGSheetUrlToCsvUrl(rawUrl) {
-        if (!rawUrl) return '';
-        let url = rawUrl.trim();
-
-        if (url.includes('/pub?') && url.includes('output=csv')) {
-            return url;
-        }
-
-        const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        if (sheetIdMatch && sheetIdMatch[1]) {
-            const sheetId = sheetIdMatch[1];
-            let gid = '0';
-            const gidMatch = url.match(/[?&]gid=([0-9]+)/) || url.match(/#gid=([0-9]+)/);
-            if (gidMatch && gidMatch[1]) {
-                gid = gidMatch[1];
-            }
-            return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
-        }
-
-        return url;
-    }
-
-
-
     // Google Sheets Modal & Sync Logic
-    const FIXED_GSHEET_URL = 'https://docs.google.com/spreadsheets/d/1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo/edit?gid=332980878#gid=332980878';
     const gsheetSyncBtn = document.getElementById('gsheet-sync-btn');
     const gsheetModal = document.getElementById('gsheet-modal');
     const closeGsheetModalBtn = document.getElementById('close-gsheet-modal');
@@ -1207,6 +1185,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // The page reloads right after a sync, so carry the notice across the reload via sessionStorage
+    const SYNC_NOTICE_KEY = 'ENDFIELD_SYNC_NOTICE';
+
+    function showNotice(message) {
+        if (window.AndroidInterface && window.AndroidInterface.showToast) {
+            window.AndroidInterface.showToast(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    function reloadWithNotice(message) {
+        try {
+            sessionStorage.setItem(SYNC_NOTICE_KEY, message);
+        } catch (e) {
+            console.warn("Could not store sync notice", e);
+        }
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
+
+    // Set when this load is itself the result of a sync reload, so the startup sync never reloads twice in a row
+    let reloadedBySync = false;
+    try {
+        const pendingNotice = sessionStorage.getItem(SYNC_NOTICE_KEY);
+        if (pendingNotice) {
+            reloadedBySync = true;
+            sessionStorage.removeItem(SYNC_NOTICE_KEY);
+            showNotice(pendingNotice);
+        }
+    } catch (e) {
+        console.warn("Could not read sync notice", e);
+    }
+
     async function syncFromGoogleSheet(isManual = true) {
         const spreadsheetId = '1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo';
         const weaponsGid = '332980878';
@@ -1217,13 +1230,16 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('ENDFIELD_GSHEET_AUTOSYNC', gsheetAutosyncCheck.checked ? 'true' : 'false');
         }
 
-        if (gsheetStatusText) {
-            gsheetStatusText.style.display = 'block';
-            gsheetStatusText.style.background = 'rgba(0, 210, 255, 0.1)';
-            gsheetStatusText.style.color = 'var(--accent)';
-            gsheetStatusText.textContent = '⏳ スプレッドシートからデータを取得中...';
+        // Only the manual sync drives the modal UI; the silent startup sync must not leave it stuck in "loading"
+        if (isManual) {
+            if (gsheetStatusText) {
+                gsheetStatusText.style.display = 'block';
+                gsheetStatusText.style.background = 'rgba(0, 210, 255, 0.1)';
+                gsheetStatusText.style.color = 'var(--accent)';
+                gsheetStatusText.textContent = '⏳ スプレッドシートからデータを取得中...';
+            }
+            if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
         }
-        if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
 
         // Remember existing weapon areas so they are never lost if matching yields no changes
         const existingAreaMap = new Map();
@@ -1296,27 +1312,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("Area effects sheet could not be loaded; preserved existing weapon areas.");
             }
 
+            normalizeRarity(weapons);
             const newJson = JSON.stringify(weapons);
             const currentJson = JSON.stringify(sourceData);
 
             localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', newJson);
 
             if (isManual) {
+                const doneMsg = `✅ 同期完了：${weapons.length} 件の武器データを更新しました。`;
                 if (gsheetStatusText) {
                     gsheetStatusText.style.background = 'rgba(15, 157, 88, 0.2)';
                     gsheetStatusText.style.color = '#57d28d';
-                    gsheetStatusText.textContent = `✅ 同期成功！ ${weapons.length} 件の武器データを更新しました。`;
+                    gsheetStatusText.textContent = doneMsg;
                 }
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                // Background startup sync: if data updated, refresh UI dynamically
-                if (newJson !== currentJson) {
-                    console.log("Startup sync: New data detected from Google Sheets, updating UI...");
-                    sourceData = weapons;
-                    applyFilters();
-                }
+                reloadWithNotice(doneMsg);
+            } else if (newJson !== currentJson && !reloadedBySync) {
+                // db, filter options and quick select are all built once from sourceData at load,
+                // so reloading is the only way to reflect newly synced data
+                console.log("Startup sync: New data detected from Google Sheets, reloading...");
+                reloadWithNotice('🔄 スプレッドシートの最新データを反映しました。');
             }
 
         } catch (err) {
