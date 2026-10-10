@@ -1196,15 +1196,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function reloadWithNotice(message) {
+    // Set once a reload is pending, so a manual sync can't start and get cut off by it
+    let reloadScheduled = false;
+
+    // Returns false when the notice could not be stored (and therefore no reload was scheduled)
+    function reloadWithNotice(message, requireNotice = false) {
         try {
             sessionStorage.setItem(SYNC_NOTICE_KEY, message);
         } catch (e) {
             console.warn("Could not store sync notice", e);
+            // Without the stored notice reloadedBySync can't be set after reload, so an unattended reload could repeat
+            if (requireNotice) return false;
         }
+        reloadScheduled = true;
+        if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
         setTimeout(() => {
             window.location.reload();
         }, 1000);
+        return true;
     }
 
     // Set when this load is itself the result of a sync reload, so the startup sync never reloads twice in a row
@@ -1214,13 +1223,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingNotice) {
             reloadedBySync = true;
             sessionStorage.removeItem(SYNC_NOTICE_KEY);
-            showNotice(pendingNotice);
+            // Defer so a blocking alert() (non-Android) doesn't hold up the initial render
+            setTimeout(() => showNotice(pendingNotice), 300);
         }
     } catch (e) {
         console.warn("Could not read sync notice", e);
     }
 
+    // Once a manual sync starts it owns the result; a still-running startup sync must not overwrite data or reload
+    let manualSyncStarted = false;
+
     async function syncFromGoogleSheet(isManual = true) {
+        if (isManual && reloadScheduled) return;
+        if (isManual) manualSyncStarted = true;
         const spreadsheetId = '1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo';
         const weaponsGid = '332980878';
         const masterCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${weaponsGid}&_t=${Date.now()}`;
@@ -1242,17 +1257,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Remember existing weapon areas so they are never lost if matching yields no changes
+        // (built from the in-memory data so areas from data.js survive on first install too)
         const existingAreaMap = new Map();
-        try {
-            const currentData = JSON.parse(localStorage.getItem('ENDFIELD_WEAPONS_CUSTOM') || '[]');
-            currentData.forEach(w => {
-                if (w.weapon_name && w.areas && w.areas.length > 0) {
-                    existingAreaMap.set(w.weapon_name, w.areas);
-                }
-            });
-        } catch (e) {
-            console.warn("Could not parse existing weapon custom areas", e);
-        }
+        sourceData.forEach(w => {
+            if (w.weapon_name && w.areas && w.areas.length > 0) {
+                existingAreaMap.set(w.weapon_name, w.areas);
+            }
+        });
 
         try {
             // 1. Fetch Weapon Master Sheet
@@ -1263,6 +1274,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const csvMasterText = await resMaster.text();
             const rowsMaster = parseCSVText(csvMasterText);
             const weapons = convertCsvRowsToWeapons(rowsMaster);
+
+            // Guard against saving a bogus response (e.g. an HTML error page parsed as CSV)
+            const namedCount = weapons.filter(w => w.weapon_name && String(w.weapon_name).trim()).length;
+            if (namedCount === 0 || namedCount < sourceData.length / 2) {
+                throw new Error(`取得した武器データが少なすぎます（${namedCount} 件）。保存を中止しました。`);
+            }
 
             // Pre-populate with existing areas as baseline
             weapons.forEach(w => {
@@ -1312,6 +1329,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("Area effects sheet could not be loaded; preserved existing weapon areas.");
             }
 
+            if (!isManual && manualSyncStarted) {
+                console.log("Startup sync: manual sync in progress, discarding startup result.");
+                return;
+            }
+
             normalizeRarity(weapons);
             const newJson = JSON.stringify(weapons);
             const currentJson = JSON.stringify(sourceData);
@@ -1328,9 +1350,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 reloadWithNotice(doneMsg);
             } else if (newJson !== currentJson && !reloadedBySync) {
                 // db, filter options and quick select are all built once from sourceData at load,
-                // so reloading is the only way to reflect newly synced data
+                // so reloading is the only way to reflect newly synced data.
+                // Skip while the sync modal is open; the saved data is picked up on the next launch.
+                if (gsheetModal && gsheetModal.classList.contains('active')) {
+                    console.log("Startup sync: New data saved; sync modal is open, deferring reload to next launch.");
+                    return;
+                }
                 console.log("Startup sync: New data detected from Google Sheets, reloading...");
-                reloadWithNotice('🔄 スプレッドシートの最新データを反映しました。');
+                reloadWithNotice('🔄 スプレッドシートの最新データを反映しました。', true);
             }
 
         } catch (err) {
