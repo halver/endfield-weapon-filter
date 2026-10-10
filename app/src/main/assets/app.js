@@ -50,10 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // rarity is used in class names and Array() lengths, so force it to a sane integer
-    sourceData.forEach(w => {
-        const r = parseInt(w.rarity, 10);
-        w.rarity = (r >= 1 && r <= 6) ? r : 5;
-    });
+    const normalizeRarity = (weapons) => {
+        weapons.forEach(w => {
+            const r = parseInt(w.rarity, 10);
+            w.rarity = (r >= 1 && r <= 6) ? r : 5;
+        });
+    };
+    normalizeRarity(sourceData);
 
     const db = [...sourceData].sort((a, b) => {
         // 1. Weapon Type Order
@@ -1047,32 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return '\uFEFF' + csvContent;
     }
 
-    function convertGSheetUrlToCsvUrl(rawUrl) {
-        if (!rawUrl) return '';
-        let url = rawUrl.trim();
-
-        if (url.includes('/pub?') && url.includes('output=csv')) {
-            return url;
-        }
-
-        const sheetIdMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        if (sheetIdMatch && sheetIdMatch[1]) {
-            const sheetId = sheetIdMatch[1];
-            let gid = '0';
-            const gidMatch = url.match(/[?&]gid=([0-9]+)/) || url.match(/#gid=([0-9]+)/);
-            if (gidMatch && gidMatch[1]) {
-                gid = gidMatch[1];
-            }
-            return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
-        }
-
-        return url;
-    }
-
-
-
     // Google Sheets Modal & Sync Logic
-    const FIXED_GSHEET_URL = 'https://docs.google.com/spreadsheets/d/1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo/edit?gid=332980878#gid=332980878';
     const gsheetSyncBtn = document.getElementById('gsheet-sync-btn');
     const gsheetModal = document.getElementById('gsheet-modal');
     const closeGsheetModalBtn = document.getElementById('close-gsheet-modal');
@@ -1207,7 +1185,57 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // The page reloads right after a sync, so carry the notice across the reload via sessionStorage
+    const SYNC_NOTICE_KEY = 'ENDFIELD_SYNC_NOTICE';
+
+    function showNotice(message) {
+        if (window.AndroidInterface && window.AndroidInterface.showToast) {
+            window.AndroidInterface.showToast(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    // Set once a reload is pending, so a manual sync can't start and get cut off by it
+    let reloadScheduled = false;
+
+    // Returns false when the notice could not be stored (and therefore no reload was scheduled)
+    function reloadWithNotice(message, requireNotice = false) {
+        try {
+            sessionStorage.setItem(SYNC_NOTICE_KEY, message);
+        } catch (e) {
+            console.warn("Could not store sync notice", e);
+            // Without the stored notice reloadedBySync can't be set after reload, so an unattended reload could repeat
+            if (requireNotice) return false;
+        }
+        reloadScheduled = true;
+        if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+        return true;
+    }
+
+    // Set when this load is itself the result of a sync reload, so the startup sync never reloads twice in a row
+    let reloadedBySync = false;
+    try {
+        const pendingNotice = sessionStorage.getItem(SYNC_NOTICE_KEY);
+        if (pendingNotice) {
+            reloadedBySync = true;
+            sessionStorage.removeItem(SYNC_NOTICE_KEY);
+            // Defer so a blocking alert() (non-Android) doesn't hold up the initial render
+            setTimeout(() => showNotice(pendingNotice), 300);
+        }
+    } catch (e) {
+        console.warn("Could not read sync notice", e);
+    }
+
+    // Once a manual sync starts it owns the result; a still-running startup sync must not overwrite data or reload
+    let manualSyncStarted = false;
+
     async function syncFromGoogleSheet(isManual = true) {
+        if (isManual && reloadScheduled) return;
+        if (isManual) manualSyncStarted = true;
         const spreadsheetId = '1dZGyJHG_oK9u5ocKmpHjThh76qvFk0knys9LYsR5Koo';
         const weaponsGid = '332980878';
         const masterCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${weaponsGid}&_t=${Date.now()}`;
@@ -1217,26 +1245,25 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('ENDFIELD_GSHEET_AUTOSYNC', gsheetAutosyncCheck.checked ? 'true' : 'false');
         }
 
-        if (gsheetStatusText) {
-            gsheetStatusText.style.display = 'block';
-            gsheetStatusText.style.background = 'rgba(0, 210, 255, 0.1)';
-            gsheetStatusText.style.color = 'var(--accent)';
-            gsheetStatusText.textContent = '⏳ スプレッドシートからデータを取得中...';
+        // Only the manual sync drives the modal UI; the silent startup sync must not leave it stuck in "loading"
+        if (isManual) {
+            if (gsheetStatusText) {
+                gsheetStatusText.style.display = 'block';
+                gsheetStatusText.style.background = 'rgba(0, 210, 255, 0.1)';
+                gsheetStatusText.style.color = 'var(--accent)';
+                gsheetStatusText.textContent = '⏳ スプレッドシートからデータを取得中...';
+            }
+            if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
         }
-        if (gsheetSyncNowBtn) gsheetSyncNowBtn.disabled = true;
 
         // Remember existing weapon areas so they are never lost if matching yields no changes
+        // (built from the in-memory data so areas from data.js survive on first install too)
         const existingAreaMap = new Map();
-        try {
-            const currentData = JSON.parse(localStorage.getItem('ENDFIELD_WEAPONS_CUSTOM') || '[]');
-            currentData.forEach(w => {
-                if (w.weapon_name && w.areas && w.areas.length > 0) {
-                    existingAreaMap.set(w.weapon_name, w.areas);
-                }
-            });
-        } catch (e) {
-            console.warn("Could not parse existing weapon custom areas", e);
-        }
+        sourceData.forEach(w => {
+            if (w.weapon_name && w.areas && w.areas.length > 0) {
+                existingAreaMap.set(w.weapon_name, w.areas);
+            }
+        });
 
         try {
             // 1. Fetch Weapon Master Sheet
@@ -1247,6 +1274,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const csvMasterText = await resMaster.text();
             const rowsMaster = parseCSVText(csvMasterText);
             const weapons = convertCsvRowsToWeapons(rowsMaster);
+
+            // Guard against saving a bogus response (e.g. an HTML error page parsed as CSV)
+            const namedCount = weapons.filter(w => w.weapon_name && String(w.weapon_name).trim()).length;
+            if (namedCount === 0 || namedCount < sourceData.length / 2) {
+                throw new Error(`取得した武器データが少なすぎます（${namedCount} 件）。保存を中止しました。`);
+            }
 
             // Pre-populate with existing areas as baseline
             weapons.forEach(w => {
@@ -1296,27 +1329,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("Area effects sheet could not be loaded; preserved existing weapon areas.");
             }
 
+            if (!isManual && manualSyncStarted) {
+                console.log("Startup sync: manual sync in progress, discarding startup result.");
+                return;
+            }
+
+            normalizeRarity(weapons);
             const newJson = JSON.stringify(weapons);
             const currentJson = JSON.stringify(sourceData);
 
             localStorage.setItem('ENDFIELD_WEAPONS_CUSTOM', newJson);
 
             if (isManual) {
+                const doneMsg = `✅ 同期完了：${weapons.length} 件の武器データを更新しました。`;
                 if (gsheetStatusText) {
                     gsheetStatusText.style.background = 'rgba(15, 157, 88, 0.2)';
                     gsheetStatusText.style.color = '#57d28d';
-                    gsheetStatusText.textContent = `✅ 同期成功！ ${weapons.length} 件の武器データを更新しました。`;
+                    gsheetStatusText.textContent = doneMsg;
                 }
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                // Background startup sync: if data updated, refresh UI dynamically
-                if (newJson !== currentJson) {
-                    console.log("Startup sync: New data detected from Google Sheets, updating UI...");
-                    sourceData = weapons;
-                    applyFilters();
+                reloadWithNotice(doneMsg);
+            } else if (newJson !== currentJson && !reloadedBySync) {
+                // db, filter options and quick select are all built once from sourceData at load,
+                // so reloading is the only way to reflect newly synced data.
+                // Skip while the sync modal is open; the saved data is picked up on the next launch.
+                if (gsheetModal && gsheetModal.classList.contains('active')) {
+                    console.log("Startup sync: New data saved; sync modal is open, deferring reload to next launch.");
+                    return;
                 }
+                console.log("Startup sync: New data detected from Google Sheets, reloading...");
+                reloadWithNotice('🔄 スプレッドシートの最新データを反映しました。', true);
             }
 
         } catch (err) {
