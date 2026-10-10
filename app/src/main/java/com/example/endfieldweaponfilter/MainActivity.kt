@@ -171,6 +171,13 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
     @JavascriptInterface
     fun startUpdate(apkUrl: String) {
         android.util.Log.d("AndroidInterface", "startUpdate called with URL: $apkUrl")
+        if (!isAllowedApkUrl(apkUrl)) {
+            android.util.Log.e("AndroidInterface", "Rejected APK URL: $apkUrl")
+            Handler(Looper.getMainLooper()).post {
+                reportUpdateError("許可されていないダウンロード元です。")
+            }
+            return
+        }
         showToast("アップデートのダウンロードを開始しました...")
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -182,16 +189,33 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
                     showToast("ダウンロード完了。インストールを開始します...")
                     triggerInstall()
                 } else {
-                    val msg = if (errorMsg.isNotBlank()) errorMsg else "ダウンロードに失敗しました。"
-                    showToast("エラー: $msg")
-                    val safeMsg = msg.replace("'", "\\'").replace("\n", " ")
-                    getWebView()?.evaluateJavascript(
-                        "if(window.onUpdateError) window.onUpdateError('$safeMsg');",
-                        null
-                    )
+                    reportUpdateError(if (errorMsg.isNotBlank()) errorMsg else "ダウンロードに失敗しました。")
                 }
             }
         }
+    }
+
+    // Only APKs published as releases of this app's own GitHub repository may be installed
+    private fun isAllowedApkUrl(apkUrl: String): Boolean {
+        val uri = Uri.parse(apkUrl)
+        return uri.scheme == "https" &&
+            uri.host == "github.com" &&
+            uri.path?.startsWith(ALLOWED_APK_PATH_PREFIX) == true &&
+            uri.path?.contains("..") == false
+    }
+
+    private fun reportUpdateError(msg: String) {
+        showToast("エラー: $msg")
+        // JSONObject.quote produces a safely escaped JS string literal
+        val jsMsg = org.json.JSONObject.quote(msg)
+        getWebView()?.evaluateJavascript(
+            "if(window.onUpdateError) window.onUpdateError($jsMsg);",
+            null
+        )
+    }
+
+    companion object {
+        private const val ALLOWED_APK_PATH_PREFIX = "/halver/endfield-weapon-filter/releases/download/"
     }
 
     private fun downloadApk(apkUrl: String): Pair<Boolean, String> {
@@ -252,6 +276,7 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
                     }
                 }
             }
+            connection.disconnect()
             android.util.Log.d("AndroidInterface", "Download finished successfully. File size: ${apkFile.length()} bytes")
             Pair(true, "")
         } catch (e: Exception) {
@@ -287,9 +312,26 @@ class AndroidInterface(private val context: Context, private val getWebView: () 
     }
 
     @JavascriptInterface
-    fun saveFile(fileName: String, content: String, mimeType: String) {
+    fun saveFile(rawFileName: String, content: String, mimeType: String) {
+        // Strip any directory components and characters that are invalid in file names
+        val fileName = File(rawFileName).name
+            .replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_")
+            .ifBlank { "export.csv" }
         Handler(Looper.getMainLooper()).post {
             try {
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q &&
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    (context as? android.app.Activity)?.let {
+                        androidx.core.app.ActivityCompat.requestPermissions(
+                            it, arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 0
+                        )
+                    }
+                    showToast("ストレージへの保存許可が必要です。許可後にもう一度保存してください。")
+                    return@post
+                }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     val resolver = context.contentResolver
                     val contentValues = android.content.ContentValues().apply {

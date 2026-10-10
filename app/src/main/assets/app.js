@@ -15,6 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Escape untrusted text (spreadsheet / localStorage data) before inserting into innerHTML
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+
     // 1. Initialize Weapon Database Data
     // WEAPONS_DATA is loaded from data.js
     if (typeof WEAPONS_DATA === 'undefined') {
@@ -43,6 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const match = String(id).match(/^(\d+)/);
         return match ? parseInt(match[1], 10) : 999;
     };
+
+    // rarity is used in class names and Array() lengths, so force it to a sane integer
+    sourceData.forEach(w => {
+        const r = parseInt(w.rarity, 10);
+        w.rarity = (r >= 1 && r <= 6) ? r : 5;
+    });
 
     const db = [...sourceData].sort((a, b) => {
         // 1. Weapon Type Order
@@ -199,32 +210,32 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="selected-weapon-card rarity-${w.rarity}">
                 <div class="card-header-main">
                     <div>
-                        <div class="weapon-title">${w.weapon_name}</div>
+                        <div class="weapon-title">${esc(w.weapon_name)}</div>
                         <div class="stars">
                             ${Array(w.rarity).fill('<span class="star-icon">★</span>').join('')}
                         </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
                         <span class="char-badge ${isSpecialChar ? 'special' : ''}">
-                            ${w.character}
+                            ${esc(w.character)}
                         </span>
                         <span class="type-badge">
-                            ${w.weapon_type || '-'}
+                            ${esc(w.weapon_type || '-')}
                         </span>
                     </div>
                 </div>
                 <div class="weapon-effects-list">
                     <div class="effect-row">
                         <span class="effect-label">基礎効果</span>
-                        <span class="effect-val effect-base">${w.base_effect || '-'}</span>
+                        <span class="effect-val effect-base">${esc(w.base_effect || '-')}</span>
                     </div>
                     <div class="effect-row">
                         <span class="effect-label">付加効果</span>
-                        <span class="effect-val effect-extra">${w.extra_effect || '-'}</span>
+                        <span class="effect-val effect-extra">${esc(w.extra_effect || '-')}</span>
                     </div>
                     <div class="effect-row">
                         <span class="effect-label">スキル効果</span>
-                        <span class="effect-val effect-skill">${w.skill_effect || '-'}</span>
+                        <span class="effect-val effect-skill">${esc(w.skill_effect || '-')}</span>
                     </div>
                 </div>
             </div>
@@ -394,14 +405,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isDummy = b !== selected.base_effect;
                 const badgeClass = isDummy ? 'opt-badge dummy-opt' : 'opt-badge base-opt';
                 const label = b;
-                return `<span class="${badgeClass}">${label}</span>`;
+                return `<span class="${badgeClass}">${esc(label)}</span>`;
             }).join(' ');
 
             let esBadgeHTML = '';
             if (recommendedExtraSkill) {
                 const badgeClass = recommendedExtraSkill.type === 'extra' ? 'opt-badge extra-opt' : 'opt-badge skill-opt';
                 const typeLabel = recommendedExtraSkill.type === 'extra' ? '付加' : 'スキル';
-                esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${recommendedExtraSkill.value}</span>`;
+                esBadgeHTML = `<span class="${badgeClass}">${typeLabel}: ${esc(recommendedExtraSkill.value)}</span>`;
             } else {
                 esBadgeHTML = `<span class="opt-badge dummy-opt">効果なし</span>`;
             }
@@ -501,11 +512,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="weapon-row-details">
                         <div class="weapon-row-top">
                             <span class="weapon-row-rarity">★${mainWeapon.rarity}</span>
-                            <span class="weapon-row-name" style="color: #fff; font-weight: 700;">${mainWeapon.weapon_name}</span>
-                            <span class="weapon-row-char" style="margin-left: auto;">${mainWeapon.character}</span>
+                            <span class="weapon-row-name" style="color: #fff; font-weight: 700;">${esc(mainWeapon.weapon_name)}</span>
+                            <span class="weapon-row-char" style="margin-left: auto;">${esc(mainWeapon.character)}</span>
                         </div>
                         <div class="weapon-row-bottom" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">
-                            <span>${effectDetails.join(' ｜ ')}</span>
+                            <span>${esc(effectDetails.join(' ｜ '))}</span>
                         </div>
                     </div>
                 `;
@@ -584,12 +595,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="weapon-row-details">
                             <div class="weapon-row-top">
                                 <span class="weapon-row-rarity">★${w.rarity}</span>
-                                <span class="weapon-row-name">${w.weapon_name}</span>
-                                <span class="weapon-row-char" style="margin-left: auto;">${w.character}</span>
+                                <span class="weapon-row-name">${esc(w.weapon_name)}</span>
+                                <span class="weapon-row-char" style="margin-left: auto;">${esc(w.character)}</span>
                             </div>
                             <div class="weapon-row-bottom" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem; display: flex; justify-content: space-between; width: 100%;">
-                                <span>一致効果: ${matchedEffects.join(' ｜ ')}</span>
-                                <span style="opacity: 0.6;">${w.weapon_type}</span>
+                                <span>一致効果: ${esc(matchedEffects.join(' ｜ '))}</span>
+                                <span style="opacity: 0.6;">${esc(w.weapon_type)}</span>
                             </div>
                         </div>
                     `;
@@ -699,16 +710,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayType = w.weapon_type === 'アーツユニット' ? 'アーツ' : (w.weapon_type || '-');
         
         const areasHtml = (w.areas && w.areas.length > 0)
-            ? w.areas.map(a => `<span class="table-area-tag">${a}</span>`).join(' ')
+            ? w.areas.map(a => `<span class="table-area-tag">${esc(a)}</span>`).join(' ')
             : '<span style="font-size: 0.75rem; color: var(--text-muted);">-</span>';
 
         tr.innerHTML = `
             <td>
-                <div class="table-w-name" style="font-weight: 700;">${w.weapon_name}</div>
+                <div class="table-w-name" style="font-weight: 700;">${esc(w.weapon_name)}</div>
                 <div class="table-areas-list" style="margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 0.25rem;">${areasHtml}</div>
             </td>
-            <td><span class="type-badge">${displayType}</span></td>
-            <td><span class="char-badge ${w.character !== '汎用' ? 'special' : ''}">${w.character}</span></td>
+            <td><span class="type-badge">${esc(displayType)}</span></td>
+            <td><span class="char-badge ${w.character !== '汎用' ? 'special' : ''}">${esc(w.character)}</span></td>
             <td style="text-align: right;">
                 <button class="reset-btn detail-action-btn" style="display: inline-flex; padding: 0.3rem 0.75rem; font-size: 0.8rem; background: rgba(242, 169, 0, 0.1); border-color: rgba(242, 169, 0, 0.2); color: var(--primary);">詳細</button>
             </td>
@@ -833,7 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let areasHtml = '';
         if (w.areas && w.areas.length > 0) {
-            areasHtml = w.areas.map(a => `<span class="table-area-tag">${a}</span>`).join(' ');
+            areasHtml = w.areas.map(a => `<span class="table-area-tag">${esc(a)}</span>`).join(' ');
         } else {
             areasHtml = `<span style="color: var(--text-muted)">-</span>`;
         }
@@ -842,7 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="detail-info-list">
                 <div class="detail-item">
                     <span class="detail-label">武器名</span>
-                    <span class="detail-value" style="font-size: 1.15rem; color: var(--primary); font-weight: 700;">${w.weapon_name}</span>
+                    <span class="detail-value" style="font-size: 1.15rem; color: var(--primary); font-weight: 700;">${esc(w.weapon_name)}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">レアリティ</span>
@@ -850,23 +861,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">武器種</span>
-                    <span class="detail-value"><span class="type-badge">${w.weapon_type || '-'}</span></span>
+                    <span class="detail-value"><span class="type-badge">${esc(w.weapon_type || '-')}</span></span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">モチーフキャラ</span>
-                    <span class="detail-value"><span class="char-badge ${isSpecialChar ? 'special' : ''}">${w.character}</span></span>
+                    <span class="detail-value"><span class="char-badge ${isSpecialChar ? 'special' : ''}">${esc(w.character)}</span></span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">基礎効果</span>
-                    <span class="detail-value base">${w.base_effect || '-'}</span>
+                    <span class="detail-value base">${esc(w.base_effect || '-')}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">付加効果</span>
-                    <span class="detail-value extra">${w.extra_effect || '-'}</span>
+                    <span class="detail-value extra">${esc(w.extra_effect || '-')}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">スキル効果</span>
-                    <span class="detail-value skill">${w.skill_effect || '-'}</span>
+                    <span class="detail-value skill">${esc(w.skill_effect || '-')}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">入手エリア</span>
@@ -1219,8 +1230,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const currentData = JSON.parse(localStorage.getItem('ENDFIELD_WEAPONS_CUSTOM') || '[]');
             currentData.forEach(w => {
-                if (w.name && w.areas && w.areas.length > 0) {
-                    existingAreaMap.set(w.name, w.areas);
+                if (w.weapon_name && w.areas && w.areas.length > 0) {
+                    existingAreaMap.set(w.weapon_name, w.areas);
                 }
             });
         } catch (e) {
@@ -1239,8 +1250,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Pre-populate with existing areas as baseline
             weapons.forEach(w => {
-                if (existingAreaMap.has(w.name)) {
-                    w.areas = existingAreaMap.get(w.name);
+                if (existingAreaMap.has(w.weapon_name)) {
+                    w.areas = existingAreaMap.get(w.weapon_name);
                 }
             });
 
